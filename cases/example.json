@@ -1,0 +1,39 @@
+{
+ "_comment": "Example case file. make-case.py writes a real one from zdb output; fields marked 'you' are asked interactively. Only the fields below are read by the tools.",
+ "name": "tank-2024",
+ "pool": {
+  "name": "tank",
+  "topology": "mirror",
+  "ashift": 12,
+  "devices": [
+   {"path": "/dev/mapper/ro_sdb1", "vdev_guid": 1111111111111111111},
+   {"path": "/dev/mapper/ro_sdc1", "vdev_guid": 2222222222222222222}
+  ]
+ },
+ "profile": {
+  "compression": ["lzjb"],
+  "checksum": ["fletcher4"],
+  "label_start": 4194304,
+  "meta_dnode_levels": 7,
+  "indirect_block_size": 16384,
+  "dnode_block_size": 16384
+ },
+ "timeline": [
+  {"txg": 1200300, "time": 1714000000},
+  {"txg": 1200310, "time": 1714000050}
+ ],
+ "crash_txg": 1200310,
+ "target": {
+  "_comment": "you: the dataset to recover and names expected in its root directory",
+  "dataset": "tank/home",
+  "root_names": ["alice", "bob"],
+  "last_change_txg": 1200290,
+  "expected_objects": 120000
+ },
+ "scan": {
+  "device": "ro_sdb1",
+  "chunk_dir": "logs/raw/scan_ro_sdb1",
+  "log": "logs/scan_ro_sdb1.log"
+ },
+ "smart_disks": ["sdb", "sdc"]
+}

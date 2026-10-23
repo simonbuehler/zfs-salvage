@@ -1,0 +1,32 @@
+# never commit secrets (docs may mention keys by name)
+*key*
+!docs/**
+*.pem
+*.yaml.local
+
+# build artefacts
+build/
+*.tar
+*.tar.*
+*.ko
+*.pkg.tar.zst
+tools/zscan/zscan
+tools/libzsalvage/libzsalvage.so
+__pycache__/
+
+# large raw output
+logs/raw/
+
+# live status and runtime state
+status/
+logs/status.log
+logs/*.err
+logs/web.log
+logs/rank-trees.log
+
+# catalog and transfers (rebuilt from logs/tree; selection and manifests are per user)
+catalog/*.sqlite
+catalog/selection_rules.jsonl
+catalog/state.json
+catalog/transfers/
+catalog/transfer_preset.json

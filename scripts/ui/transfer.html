@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>zfs-salvage transfer</title>
+<style>
+:root{--bg:#f7f7f5;--fg:#1d1d1b;--mut:#6b6b66;--card:#fff;--line:#e2e2dc;--acc:#2f6f4f;--accbg:#e3efe8;--onacc:#fff;--bad:#d03b3b;--ok:#0ca30c}
+@media (prefers-color-scheme:dark){:root{--bg:#151614;--fg:#e8e8e3;--mut:#9a9a93;--card:#1e1f1c;--line:#33342f;--acc:#7fc29b;--accbg:#22332a;--onacc:#10140f;--bad:#e66767;--ok:#4cc14c}}
+[hidden]{display:none!important} *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif} a{color:var(--acc)}
+main{max-width:1000px;margin:0 auto;padding:14px 16px 24px}
+h1{font-size:18px;margin:0} h2{font-size:14.5px;margin:0 0 8px} .mut{color:var(--mut);font-size:12.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.tile{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--card);cursor:pointer;font:inherit;color:var(--fg)}
+.tile.on{border-color:var(--acc);background:var(--accbg);box-shadow:inset 0 0 0 1px var(--acc)} .tile .ic{font-size:20px;line-height:1}
+.tile b{display:block} .tile small{color:var(--mut)}
+.field{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;align-items:center;margin-top:10px}
+@media (max-width:600px){.field{grid-template-columns:1fr}}
+input,select,button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:7px;padding:7px 10px;min-width:0}
+button{cursor:pointer} button.pri{background:var(--acc);color:var(--onacc);border-color:var(--acc)} button:disabled{opacity:.5;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:6px} .chip{border-radius:999px;padding:4px 11px;font-size:12.5px}
+.check{margin-top:12px;padding:8px 10px;border-radius:7px;background:var(--bg)} .ok{color:var(--ok)} .bad{color:var(--bad)}
+.go{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap} .go button.pri{font-size:15px;padding:9px 16px}
+.bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0} .bar>div{height:100%;background:var(--acc)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:8px}
+.job .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .job .hd b{flex:1;min-width:0;word-break:break-all}
+.log{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--mut);white-space:pre-wrap;max-height:9em;overflow:auto;margin-top:6px}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<main>
+  <nav id="steps" data-page="transfer"></nav>
+  <h1>Copy the selection to a safe place</h1>
+  <div class="mut num" id="what"></div>
+
+  <section class="card">
+    <h2>Where should the files go?</h2>
+    <div class="tiles" id="tiles">
+      <button class="tile" data-t="local"><span class="ic">💻</span><span><b>This computer</b><small>a drive or folder here (Windows drives work too)</small></span></button>
+      <button class="tile" data-t="ssh"><span class="ic">🖧</span><span><b>Another computer</b><small>over SSH, e.g. the Windows PC or the NAS</small></span></button>
+      <button class="tile" data-t="rescue"><span class="ic">🛟</span><span><b>Recovery host</b><small>a disk plugged into the recovery machine</small></span></button>
+    </div>
+    <div class="field" id="hostrow" hidden><span>Computer</span>
+      <div class="chips"><select id="host"></select><input id="hostother" placeholder="user@host" hidden></div></div>
+    <div class="field"><span>Folder</span><input id="path" placeholder="e.g. D:\rescued-home or /mnt/d/rescued-home"></div>
+    <div class="field"><span class="mut">Suggestions</span><div class="chips" id="places"><span class="mut">…</span></div></div>
+    <div class="check" id="check">Choose a place – free space is checked automatically.</div>
+    <div class="go"><button class="pri" id="go" disabled onclick="startJob()">Start copying</button>
+      <span class="mut">Interrupted? Start again with the same target – finished files are skipped.</span></div>
+    <details style="margin-top:10px"><summary class="mut">How the copy works</summary>
+      <p class="mut">Every file is read block by block from the old disks and each block is verified by its ZFS checksum (falling back to the
+      second copy). Files keep their original timestamps. A manifest records every file with its result and SHA-256 – download it from the list below.
+      Files whose blocks cannot be verified are written as far as possible and marked “partial”.</p></details>
+  </section>
+
+  <section class="card">
+    <h2>Transfers</h2>
+    <div id="jobs" class="mut">none yet</div>
+  </section>
+</main>
+<script src="/steps.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const fmtB=b=>b>=1e12?(b/1e12).toFixed(2)+' TB':b>=1e9?(b/1e9).toFixed(1)+' GB':b>=1e6?(b/1e6).toFixed(1)+' MB':b>=1e3?Math.round(b/1e3)+' KB':(b||0)+' B';
+const fmtN=n=>(n||0).toLocaleString('en-US');
+const files=n=>`${fmtN(n)} file${n===1?"":"s"}`;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+async function get(u){return (await fetch(u)).json()}
+async function postJ(u,b){return (await fetch(u,{method:'POST',body:JSON.stringify(b)})).json()}
+const SUB='rescued-home';
+let type='local', sum=null, checked=null, timer;
+
+function host(){return $('host').value==='__other'?$('hostother').value.trim():$('host').value}
+function target(){const p=$('path').value.trim();return {type,dest:type==='ssh'?`${host()}:${p}`:p}}
+function setType(t){
+  type=t; document.querySelectorAll('.tile').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  $('hostrow').hidden=t!=='ssh'; loadPlaces(); recheck();
+}
+async function loadPlaces(){
+  const el=$('places');
+  if(type==='ssh'&&!host()){el.innerHTML='<span class="mut">choose a computer</span>';return}
+  el.innerHTML='<span class="mut">looking for drives …</span>';
+  const ps=await get('/api/transfer/places?'+new URLSearchParams({type,host:type==='ssh'?host():''}));
+  if(!ps.length){el.innerHTML=`<span class="mut">${type==='rescue'
+    ?'No writable disk is mounted on the recovery host. Plug one in and mount it there (e.g. <code>mount /dev/sdX1 /mnt/target</code>), then come back.'
+    :'No drives found – type a folder above.'}</span>`;return}
+  el.innerHTML=ps.map(p=>`<button class="chip" title="${esc(p.path)}" onclick="pick('${esc(p.path)}')">${esc(p.fs==='home'?'home folder':p.fs||p.path)}${p.fs&&p.fs.endsWith('drive')?'':' '+esc(p.path)} · <b>${fmtB(p.free)}</b> free</button>`).join('');
+}
+function pick(p){$('path').value=p.replace(/[\/\\]$/,'')+'/'+SUB;recheck()}
+function recheck(){checked=null;updateGo();clearTimeout(timer);timer=setTimeout(check,600)}
+async function check(){
+  const t=target(), el=$('check');
+  if(!$('path').value.trim()||(type==='ssh'&&!host())){el.textContent='Choose a place – free space is checked automatically.';return}
+  el.textContent='checking …';
+  const r=await postJ('/api/transfer/check',t);
+  if(JSON.stringify(t)!==JSON.stringify(target()))return;           // input changed meanwhile
+  checked=r;
+  const need=sum?sum.sel_bytes:0, tight=r.free!=null&&r.free<need;
+  el.innerHTML=!r.ok?`<span class="bad">✗ ${esc(r.info)}</span>`
+    :`<span class="${tight?'bad':'ok'}">${tight?'✗':'✓'}</span> ${esc(r.info)}${r.dest&&r.dest!==t.dest?` <span class="mut">(${esc(r.dest)})</span>`:''} · `+
+     `<b>${r.free!=null?fmtB(r.free):'?'}</b> free · selection needs <b>${fmtB(need)}</b>`+(tight?' <b class="bad">– not enough space</b>':'');
+  if(r.ok)store.set('salvage.target',JSON.stringify({type,host:host(),path:$('path').value}));
+  updateGo();
+}
+function updateGo(){
+  const ok=checked&&checked.ok&&sum&&sum.sel_files>0&&(checked.free==null||checked.free>sum.sel_bytes);
+  $('go').disabled=!ok;
+  $('go').textContent=sum&&sum.sel_files?`Start copying ${files(sum.sel_files)} (${fmtB(sum.sel_bytes)})`:'Nothing selected';
+}
+async function startJob(t){await postJ('/api/transfer/start',t||target());pollJobs()}
+async function stopJob(id){await postJ('/api/transfer/stop',{id});pollJobs()}
+const ICON={running:'⟳',done:'✓',stopped:'■',prepared:'·'};
+async function pollJobs(){
+  const jobs=(await get('/api/transfer/status')).reverse();
+  window.JOBS=jobs;
+  if(!jobs.length){$('jobs').textContent='none yet';return}
+  $('jobs').innerHTML=jobs.map((j,k)=>{
+    const pct=j.bytes_total?100*j.bytes/j.bytes_total:(j.state==='done'?100:0);
+    const el=j.start?((j.end||Date.now()/1000)-j.start):0, rate=el>0?j.bytes/el:0;
+    const eta=rate>0&&j.state==='running'?(j.bytes_total-j.bytes)/rate:null;
+    const bad=/fail/.test(j.state)||j.errors, run=j.state==='running';
+    return `<div class="job"><div class="hd"><b>${esc(j.label||j.target.dest)}</b>
+      <span class="${/fail/.test(j.state)?'bad':j.state==='done'?'ok':''}">${ICON[j.state]||'✗'} ${esc(j.state)}</span>
+      ${run?`<button onclick="stopJob('${j.id}')">stop</button>`
+           :`<button onclick="startJob(JOBS[${k}].target)" title="copy files selected since, retry the rest">resume / update</button>
+             <a href="/api/transfer/manifest?id=${j.id}" download="manifest_${j.id}.tsv">manifest</a>`}</div>
+      <div class="bar"><div style="width:${pct.toFixed(1)}%"></div></div>
+      <div class="mut num">${fmtN(j.files)} / ${fmtN(j.files_total)} files · ${fmtB(j.bytes)} / ${fmtB(j.bytes_total)}${run?` · ${fmtB(rate)}/s`:''}${eta?` · about ${Math.round(eta/60)} min left`:''}
+        · <span class="ok">✓ ${fmtN(j.ok)} OK</span> · ! ${fmtN(j.partial)} partial · <span class="${j.errors?'bad':''}">✗ ${fmtN(j.errors)} errors</span>${j.already_done?` · ${fmtN(j.already_done)} copied earlier`:''}</div>
+      ${run&&j.current?`<div class="mut">now: ${esc(j.current)}</div>`:''}
+      ${run||bad?`<div class="log">${(j.recent||[]).map(esc).join('\n')}</div>`:''}</div>`}).join('');
+  if(jobs.some(j=>j.state==='running'))setTimeout(pollJobs,2000);
+}
+
+(async()=>{
+  sum=await get('/api/summary');
+  $('what').innerHTML=sum.sel_files
+    ?`${files(sum.sel_files)} · ${fmtB(sum.sel_bytes)} selected from state TXG ${fmtN(+sum.state)} · <a href="/select">change selection</a>`
+    :`Nothing selected yet – <a href="/select">choose files first</a>.`;
+  const hosts=await get('/api/transfer/hosts');
+  $('host').innerHTML='<option value="">choose …</option>'+hosts.map(h=>`<option>${esc(h)}</option>`).join('')+'<option value="__other">other (user@host) …</option>';
+  $('host').onchange=()=>{$('hostother').hidden=$('host').value!=='__other';loadPlaces();recheck()};
+  $('hostother').oninput=()=>{clearTimeout(window.ht);window.ht=setTimeout(()=>{loadPlaces();recheck()},800)};
+  $('path').oninput=recheck;
+  document.querySelectorAll('.tile').forEach(b=>b.onclick=()=>setType(b.dataset.t));
+  const pre=await get('/api/transfer/preset');
+  if(pre.type){                                                   // a prepared target wins over the remembered one
+    const [h,...rest]=pre.type==='ssh'?pre.dest.split(':'):['',pre.dest];
+    store.set('salvage.target',JSON.stringify({type:pre.type,host:h,path:pre.type==='ssh'?rest.join(':'):pre.dest}));
+    $('what').insertAdjacentHTML('beforeend',`<div class="check" style="margin-top:8px">📌 Prepared target: <b>${esc(pre.label||pre.dest)}</b>${pre.note?' – '+esc(pre.note):''}</div>`);
+  }
+  try{const t=JSON.parse(store.get('salvage.target')||'null');
+    if(t){$('path').value=t.path||'';if(t.host){if(![...$('host').options].some(o=>o.value===t.host)){$('host').value='__other';$('hostother').hidden=false;$('hostother').value=t.host}else $('host').value=t.host}type=t.type}}catch(e){}
+  setType(type); updateGo(); pollJobs();
+})();
+</script>
+</body>
+</html>

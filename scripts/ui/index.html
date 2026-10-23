@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>zfs-salvage selection</title>
+<style>
+:root{--bg:#f7f7f5;--fg:#1d1d1b;--mut:#6b6b66;--card:#fff;--line:#e2e2dc;--acc:#2f6f4f;--accbg:#e3efe8;--onacc:#fff;--bad:#d03b3b;--hov:#f0f0ec}
+@media (prefers-color-scheme:dark){:root{--bg:#151614;--fg:#e8e8e3;--mut:#9a9a93;--card:#1e1f1c;--line:#33342f;--acc:#7fc29b;--accbg:#22332a;--onacc:#10140f;--bad:#e66767;--hov:#262723}}
+[hidden]{display:none!important} *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif;padding-bottom:64px} a{color:var(--acc)}
+.wrapw{max-width:1500px;margin:0 auto;padding:14px 16px 0}
+h1{font-size:18px;margin:0} .mut{color:var(--mut);font-size:12.5px}
+main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;padding:12px 16px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.card h2{font-size:14px;margin:0 0 6px} .card h2 .mut{font-weight:400}
+.tree{font-size:13.5px;max-height:66vh;overflow:auto;margin-top:6px}
+.row{display:grid;grid-template-columns:18px 20px minmax(0,1fr) auto auto;align-items:center;gap:6px;padding:2px 4px;border-radius:5px}
+.row:hover{background:var(--hov)} .tw{cursor:pointer;color:var(--mut);text-align:center;user-select:none}
+.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .num{color:var(--mut);font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
+.kids{margin-left:18px} .bad{color:var(--bad)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input,select,button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:7px;padding:6px 9px}
+input[type=checkbox],input[type=radio]{padding:0;width:15px;height:15px;accent-color:var(--acc)}
+button{cursor:pointer} button.pri{background:var(--acc);color:var(--onacc);border-color:var(--acc)} button:disabled{opacity:.5;cursor:default}
+a.btn{text-decoration:none;border-radius:7px;padding:6px 12px;display:inline-block} a.btn.pri{background:var(--acc);color:var(--onacc)}
+button.link{border:0;background:none;color:var(--acc);padding:0;text-decoration:underline}
+.chip{border-radius:999px;padding:4px 10px;font-size:12.5px} .chip.on{background:var(--accbg);border-color:var(--acc)}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.res{max-height:48vh;overflow:auto;margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+td,th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap} td.p{white-space:normal;word-break:break-all}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden} .bar>div{height:100%;background:var(--acc)}
+.bigbar{height:12px} label.opt{display:flex;gap:6px;align-items:center;margin:4px 0}
+footer{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -2px 8px rgba(0,0,0,.06)}
+footer>div{max-width:1500px;margin:0 auto;padding:9px 16px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-variant-numeric:tabular-nums}
+footer b{font-size:15px}
+</style>
+</head>
+<body>
+<div class="wrapw">
+  <nav id="steps" data-page="select"></nav>
+  <h1>Choose what to recover</h1>
+  <div class="mut" id="state"></div>
+</div>
+<main>
+  <section class="card">
+    <h2>Browse folders</h2>
+    <div class="mut">Tick a folder or file to select it with everything below. ▸ expands · double-click a folder to filter inside it.</div>
+    <div class="tree" id="tree"></div>
+  </section>
+  <section class="card">
+    <h2>Find by type, name or date</h2>
+    <div class="mut">Quick start:</div>
+    <div class="presets">
+      <button class="chip" onclick="preset(['photo','video'])">📷 Photos &amp; videos</button>
+      <button class="chip" onclick="preset(['document'])">📄 Documents</button>
+      <button class="chip" onclick="preset([])">Everything</button>
+      <button class="chip" onclick="resetFilter()">✕ reset filter</button>
+    </div>
+    <div class="filters">
+      <input id="q" placeholder="name or path contains …" size="22">
+      <input id="from" type="month" title="modified from"> <input id="to" type="month" title="modified until">
+      <input id="min" type="number" min="0" step="0.1" placeholder="min. MB" style="width:90px">
+    </div>
+    <div class="filters" id="cats" style="margin-top:8px"></div>
+    <div class="filters mut" style="margin-top:8px">
+      <label class="opt"><input type="checkbox" id="nohidden" checked> skip hidden files and folders <span>(.cache, .mozilla, .recycle …)</span></label>
+      <span>· within <b id="under">/</b> <button class="link" onclick="setUnder('/')">all folders</button></span>
+    </div>
+    <div id="hits" class="num" style="margin-top:10px"></div>
+    <div class="filters" id="selbtns" style="margin-top:6px">
+      <button class="pri" onclick="selFilter('add')">select all matches</button>
+      <button onclick="selFilter('remove')">deselect matches</button>
+    </div>
+    <div class="res"><table><thead id="lhead"></thead><tbody id="list"></tbody></table></div>
+  </section>
+</main>
+
+<footer><div id="sum"></div></footer>
+
+<script src="/steps.js"></script>
+<script>
+const CATS=[['photo','Photos'],['video','Videos'],['audio','Audio'],['document','Documents'],['archive','Archives'],['other','Other']];
+let cats=new Set(), under='/', lastSum=null;
+const fmtB=b=>b>=1e9?(b/1e9).toFixed(1)+' GB':b>=1e6?(b/1e6).toFixed(1)+' MB':b>=1e3?Math.round(b/1e3)+' KB':(b||0)+' B';
+const fmtN=n=>(n||0).toLocaleString('en-US');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=id=>document.getElementById(id);
+async function get(u){return (await fetch(u)).json()}
+async function postJ(u,b){return (await fetch(u,{method:'POST',body:JSON.stringify(b)})).json()}
+// After a change only the checkboxes are updated in place – tree and result list keep their scroll position and open folders.
+async function post(b){showSum(await postJ('/api/select',b));syncChecks();if(b.filter)search();else updateHits()}
+async function syncChecks(){
+  const boxes=[...document.querySelectorAll('[data-sp]')];
+  const st=await postJ('/api/selstate',{paths:[...new Set(boxes.map(x=>x.dataset.sp))]});
+  for(const x of boxes){const v=st[x.dataset.sp];if(v==null)continue;
+    x.checked=v==='all'||v===1;x.indeterminate=v==='part'}
+}
+async function updateHits(){const r=await get('/api/search?'+new URLSearchParams({...params(),offset:1e9}));
+  $('hits').innerHTML=`<b>${fmtN(r.count)}</b> matches · ${fmtB(r.bytes)} · ${fmtN(r.sel)} already selected`}
+function showSum(s){
+  lastSum=s;
+  $('state').innerHTML=`Catalog of state TXG ${fmtN(+s.state)} · ${fmtN(s.files)} files · ${fmtB(s.bytes)}`+
+    (s.unreadable?` · <button class="link" onclick="showUnreadable()">${fmtN(s.unreadable)} entries unreadable</button>`:'');
+  const pct=s.bytes?100*s.sel_bytes/s.bytes:0;
+  $('sum').innerHTML=s.sel_files
+    ?`<span>Selected <b>${fmtN(s.sel_files)}</b> file${s.sel_files===1?"":"s"} · <b>${fmtB(s.sel_bytes)}</b></span>`+
+     `<span style="flex:1;min-width:120px"><div class="bar" title="${pct.toFixed(1)} % of all data"><div style="width:${pct.toFixed(1)}%"></div></div></span>`+
+     `<span class="mut">${s.cats.filter(c=>c.nsel).map(c=>`${esc(c.cat)} ${fmtN(c.nsel)}`).join(' · ')}</span>`+
+     `<button onclick="if(confirm('Clear the whole selection?'))post({op:'reset'})">clear</button>`+
+     `<a class="btn pri" href="/transfer">Continue to transfer →</a>`
+    :`<span class="mut">Nothing selected yet – tick folders on the left, or use a quick start and “select all matches”.</span>`;
+}
+async function loadKids(path,el){
+  const kids=await get('/api/children?path='+encodeURIComponent(path));
+  el.innerHTML=kids.map(k=>{
+    const dir=k.kind==='d', ep=encodeURIComponent(k.path);
+    const st=dir?(k.sel_files===0?'':(k.sel_files>=k.tot_files?'checked':'part')):(k.sel?'checked':'');
+    return `<div><div class="row${k.status!=='ok'?' bad':''}" data-p="${esc(k.path)}" title="${esc(k.path)}${k.status!=='ok'?' – '+esc(k.status):''}">
+      <span class="tw" ${dir?`onclick="tog(this,'${ep}')"`:''}>${dir?'▸':''}</span>
+      <input type="checkbox" data-sp="${esc(k.path)}" ${st==='checked'?'checked':''} data-part="${st==='part'}" onchange="post({op:this.checked?'add':'remove',path:decodeURIComponent('${ep}')})">
+      <span class="nm" ${dir?`ondblclick="setUnder(decodeURIComponent('${ep}'))"`:''}>${dir?'📁 ':''}${esc(k.name)}</span>
+      <span class="num">${dir?fmtN(k.tot_files||0)+' files':esc((k.mtime||'').slice(0,10))}</span>
+      <span class="num">${fmtB(dir?k.tot_size:k.size)}</span></div><div class="kids" hidden></div></div>`}).join('');
+  el.querySelectorAll('input[data-part=true]').forEach(i=>i.indeterminate=true);
+}
+async function tog(t,p){const kids=t.parentElement.nextElementSibling;if(kids.hidden){kids.hidden=false;t.textContent='▾';await loadKids(decodeURIComponent(p),kids)}else{kids.hidden=true;t.textContent='▸'}}
+
+// ------------------------------------------------ filter
+function params(){const v=id=>$(id).value;return {q:v('q'),cat:[...cats].join(','),from:v('from'),to:v('to'),min:v('min'),under,nohidden:$('nohidden').checked?'1':''}}
+const hasFilter=p=>p.q||p.cat||p.from||p.to||p.min||p.under!=='/';
+const row=i=>`<tr class="${i.status!=='ok'?'bad':''}"><td><input type="checkbox" data-sp="${esc(i.path)}" ${i.sel?'checked':''} onchange="post({op:this.checked?'add':'remove',path:decodeURIComponent('${encodeURIComponent(i.path)}')})"></td><td class="p">${esc(i.path)}</td><td>${fmtB(i.size)}</td><td>${esc((i.mtime||'').slice(0,10))}</td></tr>`;
+let shown=0, timer, all=false;
+function search(){clearTimeout(timer);timer=setTimeout(async()=>{
+  const p=params(), r=await get('/api/search?'+new URLSearchParams(p)), list=$('list');
+  $('lhead').innerHTML='<tr><th></th><th>Path</th><th>Size</th><th>Modified</th></tr>'; $('selbtns').hidden=false;
+  $('hits').innerHTML=`<b>${fmtN(r.count)}</b> matches · ${fmtB(r.bytes)} · ${fmtN(r.sel)} already selected`;
+  if(!hasFilter(p)&&!all){
+    const s=lastSum||await get('/api/summary');
+    list.innerHTML=`<tr><td></td><td class="mut" colspan="3" style="white-space:normal">Pick a quick start or a category, type part of a name, or set a date range – matching files from all folders appear here.</td></tr>`+
+      s.cats.map(c=>`<tr><td></td><td><button class="chip" onclick="toggleCat('${c.cat}')">${esc(c.cat)}</button></td><td>${fmtB(c.s)}</td><td>${fmtN(c.n)} files</td></tr>`).join('');
+    return;
+  }
+  shown=r.items.length; list.innerHTML=r.items.map(row).join('')+more(r.count);
+},250)}
+function more(count){return count>shown?`<tr id="more"><td></td><td colspan="3"><button onclick="loadMore(${count})">load ${Math.min(200,count-shown)} more</button> <span class="mut">(${fmtN(shown)} of ${fmtN(count)} shown)</span></td></tr>`:''}
+async function loadMore(count){
+  const r=await get('/api/search?'+new URLSearchParams({...params(),offset:shown}));
+  $('more')?.remove(); shown+=r.items.length;
+  $('list').insertAdjacentHTML('beforeend',r.items.map(row).join('')+more(count));
+}
+function selFilter(op){const p=params();if(!hasFilter(p)&&!confirm(op==='add'?'No filter set: select EVERYTHING that is shown as a match?':'No filter set: deselect EVERYTHING?'))return;post({op,filter:p})}
+function setUnder(p){under=p;$('under').textContent=p;search()}
+function setCats(list){cats=new Set(list);document.querySelectorAll('#cats .chip').forEach(b=>b.classList.toggle('on',cats.has(b.dataset.k)))}
+function toggleCat(k){const s=new Set(cats);s.has(k)?s.delete(k):s.add(k);setCats([...s]);search()}
+function preset(list){resetFilter(false);setCats(list);all=list.length===0;$('nohidden').checked=true;search()}
+function resetFilter(run=true){['q','from','to','min'].forEach(id=>$(id).value='');setCats([]);all=false;setUnder('/');if(run)search()}
+async function showUnreadable(){
+  const r=await get('/api/unreadable');
+  $('hits').innerHTML=`<b>${fmtN(r.length)}</b> unreadable entries – neither copy could be read; they are skipped during transfer. <button class="link" onclick="search()">back to the filter</button>`;
+  $('selbtns').hidden=true;
+  $('lhead').innerHTML='<tr><th></th><th>Path</th><th>Type</th><th>Problem</th></tr>';
+  $('list').innerHTML=r.map(i=>`<tr class="bad"><td></td><td class="p">${esc(i.path)}</td><td>${i.kind==='d'?'folder':'file'}</td>`+
+    `<td title="${esc(i.status)}">${esc(String(i.status).split(' ')[0])}</td></tr>`).join('');
+}
+
+
+$('cats').innerHTML=CATS.map(([k,l])=>`<button class="chip" data-k="${k}">${l}</button>`).join('');
+document.querySelectorAll('#cats .chip').forEach(b=>b.onclick=()=>{all=false;toggleCat(b.dataset.k)});
+['q','from','to','min'].forEach(id=>$(id).oninput=search); $('nohidden').onchange=search;
+get('/api/summary').then(s=>{showSum(s);search()});loadKids('/',$('tree'));
+</script>
+</body>
+</html>
