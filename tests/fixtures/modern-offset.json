@@ -1,0 +1,6 @@
+{
+ "variant": "modern-offset",
+ "base": "modern-single",
+ "embed_offset": 1052160,
+ "purpose": "vdev start finder"
+}

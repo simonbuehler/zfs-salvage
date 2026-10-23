@@ -1,0 +1,513 @@
+{
+ "variant": "modern-sha256",
+ "pool": "fx-modern-sha256",
+ "zfs_version": "zfs-2.2.2-0ubuntu9.5",
+ "create": [
+  "-o",
+  "ashift=12",
+  "-O",
+  "checksum=sha256",
+  "0"
+ ],
+ "devices": [
+  "d0.img"
+ ],
+ "device_size": 134217728,
+ "label_start": 4194304,
+ "files": [
+  {
+   "path": "/docs/note-00.txt",
+   "type": "f",
+   "size": 13208,
+   "sha256": "92aa59fb87e43411699eb6d27d2622d79a64e3538816a2b5c49376cebe48c92d",
+   "mtime": 1400000000
+  },
+  {
+   "path": "/docs/2014/note-01.txt",
+   "type": "f",
+   "size": 10077,
+   "sha256": "3d40a59739861a8241fd9753c80d9b3d2748ecb2b30bca73a037d3e34136ea46",
+   "mtime": 1400003607
+  },
+  {
+   "path": "/photos/2013-12/note-02.txt",
+   "type": "f",
+   "size": 8778,
+   "sha256": "6b22fc976b8d63d28c253172495883d62767dd3326c27a2629fb54253d86492b",
+   "mtime": 1400007214
+  },
+  {
+   "path": "/photos/2014-04/note-03.txt",
+   "type": "f",
+   "size": 9099,
+   "sha256": "e9f66ba75e9c3970fea63801594fdf59fe13509594d21a203264e01a5729646c",
+   "mtime": 1400010821
+  },
+  {
+   "path": "/a/b/c/d/e/note-04.txt",
+   "type": "f",
+   "size": 744,
+   "sha256": "0d5766e2c2e3ef08148236fcdcbbb10dcfdc4e9c185223bea7ce2c8a14943de2",
+   "mtime": 1400014428
+  },
+  {
+   "path": "/docs/note-05.txt",
+   "type": "f",
+   "size": 8156,
+   "sha256": "35b148947ba183e31fe8101335262fe972568fc349a1b1645e778fe413eff133",
+   "mtime": 1400018035
+  },
+  {
+   "path": "/docs/2014/note-06.txt",
+   "type": "f",
+   "size": 12985,
+   "sha256": "d15cb1efb1aff05e4c78dc64712893462e321c85eac18d4dd612826cb2542309",
+   "mtime": 1400021642
+  },
+  {
+   "path": "/photos/2013-12/note-07.txt",
+   "type": "f",
+   "size": 2891,
+   "sha256": "8590b896853a15e38c709351b5d137102d7df2e19e9a9467ff1664b60306358c",
+   "mtime": 1400025249
+  },
+  {
+   "path": "/photos/2014-04/note-08.txt",
+   "type": "f",
+   "size": 5333,
+   "sha256": "56b1703983e70bb1ff1cda79c2341428ea52ed0ca027b08d14e869052ce090f5",
+   "mtime": 1400028856
+  },
+  {
+   "path": "/a/b/c/d/e/note-09.txt",
+   "type": "f",
+   "size": 10466,
+   "sha256": "010c35d23a53f156bc6b59329d6a3136cd40e385a740441ed924bfef844526a0",
+   "mtime": 1400032463
+  },
+  {
+   "path": "/docs/note-10.txt",
+   "type": "f",
+   "size": 11747,
+   "sha256": "0c16a4c9e0efe64c0248bcbebd2fd6ad09b77b18ccc7df5b0d34f874cf7a00ef",
+   "mtime": 1400036070
+  },
+  {
+   "path": "/docs/2014/note-11.txt",
+   "type": "f",
+   "size": 5523,
+   "sha256": "53e2a36f8a4f46e2b3e7d5a34e9ad04e8efe811247830028c40ebaf8a7dac710",
+   "mtime": 1400039677
+  },
+  {
+   "path": "/photos/2013-12/note-12.txt",
+   "type": "f",
+   "size": 10675,
+   "sha256": "ddf08748d2d9bd844e5c2b2cc2043391dfda294e923ec595c21e5da984d06b7e",
+   "mtime": 1400043284
+  },
+  {
+   "path": "/photos/2014-04/note-13.txt",
+   "type": "f",
+   "size": 9300,
+   "sha256": "3044c4570e6d9987d6d8f9f047b95b830c51b48a58300b6d913775512c40728d",
+   "mtime": 1400046891
+  },
+  {
+   "path": "/a/b/c/d/e/note-14.txt",
+   "type": "f",
+   "size": 8891,
+   "sha256": "f6b948ae003093cb232fc8d8796367e97845d7a81f6177d96484ed79535b0e87",
+   "mtime": 1400050498
+  },
+  {
+   "path": "/docs/note-15.txt",
+   "type": "f",
+   "size": 3302,
+   "sha256": "10d13cfed137cd3a3a25710b323ee3852b410166247fb57b8053bfb297bceedb",
+   "mtime": 1400054105
+  },
+  {
+   "path": "/docs/2014/note-16.txt",
+   "type": "f",
+   "size": 3943,
+   "sha256": "bdf4fb6717c132eb6941f2105b4e1d479d6cfb2a52c8ccebbff844131008465f",
+   "mtime": 1400057712
+  },
+  {
+   "path": "/photos/2013-12/note-17.txt",
+   "type": "f",
+   "size": 782,
+   "sha256": "2b33d8b016e4c0085a34e188d0b8031e42a9973178b0c39c906668138f9ba59b",
+   "mtime": 1400061319
+  },
+  {
+   "path": "/photos/2014-04/note-18.txt",
+   "type": "f",
+   "size": 7136,
+   "sha256": "f49997d33e6eaf64a110e71a7d919a152822ff9847dd01aebd882dec5c1f3207",
+   "mtime": 1400064926
+  },
+  {
+   "path": "/a/b/c/d/e/note-19.txt",
+   "type": "f",
+   "size": 4600,
+   "sha256": "38ad67a1588a28a69cf66f2d4fced3f5d5050a18a12cfa3c3ee6fa631c02b235",
+   "mtime": 1400068533
+  },
+  {
+   "path": "/docs/note-20.txt",
+   "type": "f",
+   "size": 7869,
+   "sha256": "7cb4a885ac3048de2252488eeb5bf6892188362078402676ca49b605a887e498",
+   "mtime": 1400072140
+  },
+  {
+   "path": "/docs/2014/note-21.txt",
+   "type": "f",
+   "size": 1063,
+   "sha256": "bd5f57b907b362e4646865972a4e8ed78bd5d7fce45d33d3a90fd47b026f3745",
+   "mtime": 1400075747
+  },
+  {
+   "path": "/photos/2013-12/note-22.txt",
+   "type": "f",
+   "size": 6068,
+   "sha256": "f27cfe211966a11c1cd7fa8783ee0beffb73cde605063cb467049aa64c95a793",
+   "mtime": 1400079354
+  },
+  {
+   "path": "/photos/2014-04/note-23.txt",
+   "type": "f",
+   "size": 2286,
+   "sha256": "2b78e262fb6be06d04b48897c43a08524f9d30de6a592181698a102ba5821456",
+   "mtime": 1400082961
+  },
+  {
+   "path": "/a/b/c/d/e/note-24.txt",
+   "type": "f",
+   "size": 9907,
+   "sha256": "ae8280fbd4675f512e47616ad20c8b51f7d0d68a9d8cd5e6975bc542d5b448cc",
+   "mtime": 1400086568
+  },
+  {
+   "path": "/docs/note-25.txt",
+   "type": "f",
+   "size": 6148,
+   "sha256": "954718266d2860eef60dcf22bfd8b8e0b9c4d235e641762932ddbfdaf0d829bb",
+   "mtime": 1400090175
+  },
+  {
+   "path": "/docs/2014/note-26.txt",
+   "type": "f",
+   "size": 4872,
+   "sha256": "87f0f56c259784098bdd354933f45ac16f2e0a243a97f14feb65656b7824db0c",
+   "mtime": 1400093782
+  },
+  {
+   "path": "/photos/2013-12/note-27.txt",
+   "type": "f",
+   "size": 5158,
+   "sha256": "9441ef5ccb7f87ba7ab79e760b3da219343c001c414bcd7f05900ece3ebff17e",
+   "mtime": 1400097389
+  },
+  {
+   "path": "/photos/2014-04/note-28.txt",
+   "type": "f",
+   "size": 9657,
+   "sha256": "19fe2b09caccf886f16216279011215af779cfc7b2e9dea64325234a21bd864b",
+   "mtime": 1400100996
+  },
+  {
+   "path": "/a/b/c/d/e/note-29.txt",
+   "type": "f",
+   "size": 1597,
+   "sha256": "92ee3be2da803a03eed2077ed53fd82bda2e5504e9c0f25c4f51f424b231baaf",
+   "mtime": 1400104603
+  },
+  {
+   "path": "/docs/note-30.txt",
+   "type": "f",
+   "size": 9925,
+   "sha256": "1e68aa353d8ca60d926f1a90190dda99f44fa39aa051204e8670d16cee3e4beb",
+   "mtime": 1400108210
+  },
+  {
+   "path": "/docs/2014/note-31.txt",
+   "type": "f",
+   "size": 12331,
+   "sha256": "8a5c4aee9ec0180aef4b951aa5980b24e9e243a3a414b0c1a7e6b4c599fdc8a4",
+   "mtime": 1400111817
+  },
+  {
+   "path": "/photos/2013-12/note-32.txt",
+   "type": "f",
+   "size": 3935,
+   "sha256": "21a3113ce90d146992708c7ed35220cd0a050024d6e003ab5d3cbd9d9e218609",
+   "mtime": 1400115424
+  },
+  {
+   "path": "/photos/2014-04/note-33.txt",
+   "type": "f",
+   "size": 3985,
+   "sha256": "f9096148ea1557353657063b1e8af80bcf291a3571d639157131e23860b86aff",
+   "mtime": 1400119031
+  },
+  {
+   "path": "/a/b/c/d/e/note-34.txt",
+   "type": "f",
+   "size": 6613,
+   "sha256": "87875596ca950fd6e99bfe1670d5bce28f398992380a21e6570a878eeec862d9",
+   "mtime": 1400122638
+  },
+  {
+   "path": "/docs/note-35.txt",
+   "type": "f",
+   "size": 2286,
+   "sha256": "dcdc1a31b644b6d356cdc28564248e93fa8615f23aec428f302b4eaa0a37525c",
+   "mtime": 1400126245
+  },
+  {
+   "path": "/docs/2014/note-36.txt",
+   "type": "f",
+   "size": 12585,
+   "sha256": "ce3ff5810ded5c9e7c96e6307c44050ea94e80c7fa34a40345991cd12ba6f3f6",
+   "mtime": 1400129852
+  },
+  {
+   "path": "/photos/2013-12/note-37.txt",
+   "type": "f",
+   "size": 4941,
+   "sha256": "fd986ee115b981d58ba542f7b302a8bc7a4c8e3c5d0c952bdef3904314bb8a4d",
+   "mtime": 1400133459
+  },
+  {
+   "path": "/photos/2014-04/note-38.txt",
+   "type": "f",
+   "size": 8983,
+   "sha256": "aaba2165403f6dcf5d302ca04bd2ed99b9692b5d6de90969403806bdd2325899",
+   "mtime": 1400137066
+  },
+  {
+   "path": "/a/b/c/d/e/note-39.txt",
+   "type": "f",
+   "size": 8827,
+   "sha256": "42ee82595f2a27f914928dc3ab420e3b897adf5922ba50913b8bd8aa1442224f",
+   "mtime": 1400140673
+  },
+  {
+   "path": "/photos/2013-12/img_0000.jpg",
+   "type": "f",
+   "size": 681732,
+   "sha256": "04db777649fe5c137c6a84fd3a7e1db0c6f15fd618333d17b65d7f21db38c076",
+   "mtime": 1400144280
+  },
+  {
+   "path": "/photos/2013-12/img_0001.jpg",
+   "type": "f",
+   "size": 1573124,
+   "sha256": "68ca504a55b99e903cb9531089ed2a046f65e63c4eb37b17c89eb6d20bf6f018",
+   "mtime": 1400147887
+  },
+  {
+   "path": "/photos/2013-12/img_0002.jpg",
+   "type": "f",
+   "size": 1580036,
+   "sha256": "8ccd33bf8b4613eeac90deec46298c97d0684448ecf64b9e5da128d232b6d5c0",
+   "mtime": 1400151494
+  },
+  {
+   "path": "/photos/2014-04/img_0003.jpg",
+   "type": "f",
+   "size": 1006596,
+   "sha256": "ddc18b2c9728e9626c0ff7a581a19319e457a45cddaf1534cf4d32375730b9ac",
+   "mtime": 1400155101
+  },
+  {
+   "path": "/photos/2014-04/img_0004.jpg",
+   "type": "f",
+   "size": 1062916,
+   "sha256": "347793894fc662cac23901c28a54b741a8acb80353875936d68d9e8839473db5",
+   "mtime": 1400158708
+  },
+  {
+   "path": "/photos/2014-04/img_0005.jpg",
+   "type": "f",
+   "size": 1065988,
+   "sha256": "18df71655c624b9ea4ca6fa15ea5b2d2c776c552b6b34f818bb59cb2b45719c4",
+   "mtime": 1400162315
+  },
+  {
+   "path": "/photos/Ausflüge Fertig/Bild ä 01.jpg",
+   "type": "f",
+   "size": 230404,
+   "sha256": "52d086951215b83711b136816533c1764c63cb78fb39ffc800845b80c9cb264d",
+   "mtime": 1400165922
+  },
+  {
+   "path": "/bin/random-0.bin",
+   "type": "f",
+   "size": 262144,
+   "sha256": "b376a6c7de2d94de1001f001f7d898f063727579d1332ce89c3fdce35cb1cf14",
+   "mtime": 1400169529
+  },
+  {
+   "path": "/bin/random-1.bin",
+   "type": "f",
+   "size": 262144,
+   "sha256": "8db8c34446ce363acfa78e6252df7fe9fde66bf10b100fb205239abc0af64ed3",
+   "mtime": 1400173136
+  },
+  {
+   "path": "/video/big.mts",
+   "type": "f",
+   "size": 47185920,
+   "sha256": "6367fab1aa4f460c6aed021e4da6d41876f2592a9f15a464db4d274941fc24c6",
+   "mtime": 1400176743
+  },
+  {
+   "path": "/docs/empty.txt",
+   "type": "f",
+   "size": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "mtime": 1400180350
+  },
+  {
+   "path": "/docs/tiny.txt",
+   "type": "f",
+   "size": 55,
+   "sha256": "33c6c70490afb7880028f36cad5cd00b80e9c9fa69cf2411f00a1e0ca842df5e",
+   "mtime": 1400183957
+  },
+  {
+   "path": "/.cache/thumb.png",
+   "type": "f",
+   "size": 2052,
+   "sha256": "69838942d3193f65ab8f5c5a23f89906a5cfe4b32cde55d1a699a01f01d069d0",
+   "mtime": 1400187564
+  },
+  {
+   "path": "/photos/latest",
+   "type": "l",
+   "target": "2014-04"
+  }
+ ],
+ "features": {
+  "feature@async_destroy": "enabled",
+  "feature@empty_bpobj": "active",
+  "feature@lz4_compress": "active",
+  "feature@multi_vdev_crash_dump": "enabled",
+  "feature@spacemap_histogram": "active",
+  "feature@enabled_txg": "active",
+  "feature@hole_birth": "active",
+  "feature@extensible_dataset": "active",
+  "feature@embedded_data": "active",
+  "feature@bookmarks": "enabled",
+  "feature@filesystem_limits": "enabled",
+  "feature@large_blocks": "enabled",
+  "feature@large_dnode": "enabled",
+  "feature@sha512": "enabled",
+  "feature@skein": "enabled",
+  "feature@edonr": "enabled",
+  "feature@userobj_accounting": "active",
+  "feature@encryption": "enabled",
+  "feature@project_quota": "active",
+  "feature@device_removal": "enabled",
+  "feature@obsolete_counts": "enabled",
+  "feature@zpool_checkpoint": "enabled",
+  "feature@spacemap_v2": "active",
+  "feature@allocation_classes": "enabled",
+  "feature@resilver_defer": "enabled",
+  "feature@bookmark_v2": "enabled",
+  "feature@redaction_bookmarks": "enabled",
+  "feature@redacted_datasets": "enabled",
+  "feature@bookmark_written": "enabled",
+  "feature@log_spacemap": "active",
+  "feature@livelist": "enabled",
+  "feature@device_rebuild": "enabled",
+  "feature@zstd_compress": "enabled",
+  "feature@draid": "enabled",
+  "feature@zilsaxattr": "enabled",
+  "feature@head_errlog": "active",
+  "feature@blake3": "enabled",
+  "feature@block_cloning": "enabled",
+  "feature@vdev_zaps_v2": "active"
+ },
+ "datasets": {
+  "mos": {
+   "type": "META",
+   "id": 0,
+   "objects": 54,
+   "size": "324K"
+  },
+  "fx-modern-sha256/home": {
+   "type": "ZPL",
+   "id": 387,
+   "objects": 74,
+   "size": "5.69M",
+   "rootbp": "DVA[0]=<0:3065000:1000> DVA[1]=<0:132b000:1000> [L0 DMU objset] sha256 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=8b1724089b43823f:fe267fd8a73af5c3:182486829607675b:37d7d52cf0534d36",
+   "dvas": [
+    {
+     "vdev": 0,
+     "offset": 50745344,
+     "asize": 4096
+    },
+    {
+     "vdev": 0,
+     "offset": 20099072,
+     "asize": 4096
+    }
+   ],
+   "lsize": 4096,
+   "psize": 4096,
+   "birth": 44,
+   "objset_block": "sha256 uncompressed unencrypted"
+  },
+  "fx-modern-sha256": {
+   "type": "ZPL",
+   "id": 54,
+   "objects": 7,
+   "size": "96K"
+  }
+ },
+ "newest_txg": 58,
+ "target": "fx-modern-sha256/home",
+ "meta_dnode": {
+  "nlevels": 6,
+  "indirect_block_size": 131072,
+  "data_block_size": 16384
+ },
+ "meta_dnode_blocks": [
+  "0 L5      0:3063000:1000 20000L/1000P F=74 B=44/44 cksum=78c2b93bb461d385:a530d41644aa3855:ba3c2d4e42868d71:e3ee13f979b9b1b2",
+  "0  L4     0:3062000:1000 20000L/1000P F=74 B=44/44 cksum=ada3a0778114e356:ebd982c4949109fa:43fb31e6ae5aaf5e:4ad0ceedf61b62fb",
+  "0   L3    0:3061000:1000 20000L/1000P F=74 B=44/44 cksum=58e9ebd01274b538:fa973c0fa721fddf:2790fdd905ccfc8b:138f2b77ae40957f",
+  "0    L2   0:3060000:1000 20000L/1000P F=74 B=44/44 cksum=87c0621ebfe5dab4:a305f868c8d701d3:95a21216a36d95fa:f1d95ef477144dd8",
+  "0     L1  0:305f000:1000 20000L/1000P F=74 B=44/44 cksum=2b06b0852f2cb5e6:9b8a5bb58a16efdb:a2738a2b33d7918c:93db97e6125cd994",
+  "0      L0 0:3058000:1000 4000L/1000P F=31 B=44/44 cksum=bb059f071a955845:b83d0cbc7e02b4e6:05c8a9bdcbf2b2c2:7ab0c1ddbb8178fd",
+  "4000      L0 0:3059000:1000 4000L/1000P F=32 B=44/44 cksum=71d0960ac0a374c6:0574352a946538d8:e35b7178ef8cb42b:82009affb8fae1a1",
+  "8000      L0 0:305e000:1000 4000L/1000P F=9 B=44/44 cksum=b502ba2b37a356da:814de5605630fda6:1f30ecd3702b6159:9c85910736d87640",
+  "10000      L0 0:126000:1000 4000L/1000P F=2 B=12/12 cksum=916d4bcb18175585:3e03b058eb8a0ee1:63edb313561e18bd:e2937205e35470e1"
+ ],
+ "layout": "plain",
+ "damage": {
+  "spec": [
+   {
+    "dev": "d0.img",
+    "offset": 54939648,
+    "length": 4096,
+    "seed": 1000
+   },
+   {
+    "dev": "d0.img",
+    "offset": 24293376,
+    "length": 4096,
+    "seed": 1001
+   }
+  ],
+  "zdb_error": "failed to hold dataset 'fx-modern-sha256/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-sha256/home': Input/output error | zdb: can't open 'fx-modern-sha256/home': Input/output error | [exit 1]"
+ },
+ "image_sha256": {
+  "d0.img": "4f1cbad5201a40c29ecc9810621da455379da462e5399af5af97afeba4dcbe5a"
+ },
+ "seconds": 9.9
+}

@@ -30,21 +30,22 @@ LABEL = CASE.get('profile', {}).get('label_start', 0x400000)
 LEVELS = CASE.get('profile', {}).get('meta_dnode_levels', 7)
 
 
-def candidates():
+def candidates(raw=RAW, levels=LEVELS, label=LABEL):
+    """Tree-root candidates from the finished scan chunks in raw (parameters: tests/run.py)."""
     roots, objsets, seen = {}, [], set()
-    for done in sorted(glob.glob(f'{RAW}/chunk_*.tsv.gz.done')):
+    for done in sorted(glob.glob(f'{raw}/chunk_*.tsv.gz.done')):
         with gzip.open(done[:-5], 'rt') as f:
             for line in f:
                 c = line.rstrip('\n').split('\t')
                 kv = dict(x.split('=', 1) for x in c[6:] if '=' in x)
-                if c[1] == 'IND' and kv.get('child_level') == str(LEVELS - 2):
+                if c[1] == 'IND' and kv.get('child_level') == str(levels - 2):
                     if c[5] in seen:
                         continue
                     seen.add(c[5])
                     roots[c[0]] = ('IND', c[0], c[2], c[3], c[4], int(kv['max_birth']))
-                elif c[1] == 'OBJSET' and kv.get('nlevels') == str(LEVELS):
+                elif c[1] == 'OBJSET' and kv.get('nlevels') == str(levels):
                     objsets.append(('OBJSET', c[0], c[2], c[3], c[4], int(kv['bp_birth']),
-                                    f'{int(kv["bp_dva0"], 16) + LABEL:x}', c[5]))
+                                    f'{int(kv["bp_dva0"], 16) + label:x}', c[5]))
     out = list(roots.values())
     for o in objsets:
         if o[6] not in roots and o[7] not in seen:

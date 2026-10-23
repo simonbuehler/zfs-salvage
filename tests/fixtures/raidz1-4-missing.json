@@ -1,0 +1,8 @@
+{
+ "variant": "raidz1-4-missing",
+ "base": "raidz1-4",
+ "omit": [
+  "d3.img"
+ ],
+ "purpose": "refused until raidz parity reconstruction exists"
+}

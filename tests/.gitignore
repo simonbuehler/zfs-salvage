@@ -1,0 +1,7 @@
+# fixture images: large and not reproducible bit for bit (pool GUIDs, timestamps); the sidecars and
+# SHA256SUMS identify the set. Until they are a release asset, regenerate with tests/vm/run.sh tests/make-fixtures.sh
+fixtures/*/*.img.xz
+vm/run.log
+vm/console.log
+vm/apt.log
+vm/exit-code

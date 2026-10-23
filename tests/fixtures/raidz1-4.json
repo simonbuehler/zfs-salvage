@@ -1,0 +1,507 @@
+{
+ "variant": "raidz1-4",
+ "pool": "fx-raidz1-4",
+ "zfs_version": "zfs-2.2.2-0ubuntu9.5",
+ "create": [
+  "-o",
+  "ashift=12",
+  "raidz1",
+  "0",
+  "1",
+  "2",
+  "3"
+ ],
+ "devices": [
+  "d0.img",
+  "d1.img",
+  "d2.img",
+  "d3.img"
+ ],
+ "device_size": 134217728,
+ "label_start": 4194304,
+ "files": [
+  {
+   "path": "/docs/note-00.txt",
+   "type": "f",
+   "size": 6692,
+   "sha256": "59f1013591b3afcd629f0dbf5585724654409c276eebd7eac03818572595e26d",
+   "mtime": 1400000000
+  },
+  {
+   "path": "/docs/2014/note-01.txt",
+   "type": "f",
+   "size": 5259,
+   "sha256": "da1727ab2ff46426670b78583c558d53aa9f018d2ce76bde32f282fa5d705d91",
+   "mtime": 1400003607
+  },
+  {
+   "path": "/photos/2013-12/note-02.txt",
+   "type": "f",
+   "size": 8339,
+   "sha256": "3e1f90282c494d909ccb6c93d5739057b012ce41a787fff84ac9939f6c029ea9",
+   "mtime": 1400007214
+  },
+  {
+   "path": "/photos/2014-04/note-03.txt",
+   "type": "f",
+   "size": 8991,
+   "sha256": "90ac178928b862fc4e7233a5cf963cd5a340788e20d0eb2ac9e5a7569dffe9fa",
+   "mtime": 1400010821
+  },
+  {
+   "path": "/a/b/c/d/e/note-04.txt",
+   "type": "f",
+   "size": 9653,
+   "sha256": "d8116b8e6acea0474a2efb396f75999926d8b42b427aeed0a149f062e7814c30",
+   "mtime": 1400014428
+  },
+  {
+   "path": "/docs/note-05.txt",
+   "type": "f",
+   "size": 7779,
+   "sha256": "10cccad68ce840e77b94e374d5a82f1235a7844609daf7d430981be2db8d35d5",
+   "mtime": 1400018035
+  },
+  {
+   "path": "/docs/2014/note-06.txt",
+   "type": "f",
+   "size": 4326,
+   "sha256": "35da5f6d0bf3dfd3cd0b325505f1fc2e0f5c5ffd8dc92c27736d6466386ffd96",
+   "mtime": 1400021642
+  },
+  {
+   "path": "/photos/2013-12/note-07.txt",
+   "type": "f",
+   "size": 925,
+   "sha256": "4316bc20de543ce5984797ab545521f5d27dd54f44a0f3817949a0e1f655a3ae",
+   "mtime": 1400025249
+  },
+  {
+   "path": "/photos/2014-04/note-08.txt",
+   "type": "f",
+   "size": 5661,
+   "sha256": "a038d98c02029f329f02858b2e5f55510038839d9733aaa7b8c7904cc85f3c55",
+   "mtime": 1400028856
+  },
+  {
+   "path": "/a/b/c/d/e/note-09.txt",
+   "type": "f",
+   "size": 2060,
+   "sha256": "ef6e3a4a4e7a48e52c146d0d086caf8c7d27a6480c88302447a11826f7cf811e",
+   "mtime": 1400032463
+  },
+  {
+   "path": "/docs/note-10.txt",
+   "type": "f",
+   "size": 13735,
+   "sha256": "f29e3265bfc8609d9acbd11e90f3262019ad30522ec6219b8e0431fd089171b1",
+   "mtime": 1400036070
+  },
+  {
+   "path": "/docs/2014/note-11.txt",
+   "type": "f",
+   "size": 13426,
+   "sha256": "ebf55829ca1d6abd70396c1b595c448993370721562fde41aa7a8fe0d667aeb5",
+   "mtime": 1400039677
+  },
+  {
+   "path": "/photos/2013-12/note-12.txt",
+   "type": "f",
+   "size": 11279,
+   "sha256": "2062c55468b069a7ceff93453b97f4119376614b609fe18955318548f6f1488c",
+   "mtime": 1400043284
+  },
+  {
+   "path": "/photos/2014-04/note-13.txt",
+   "type": "f",
+   "size": 2146,
+   "sha256": "2db472a4d8e41d32903a4691989eccf06c718bca50915532970f1383cf057bbb",
+   "mtime": 1400046891
+  },
+  {
+   "path": "/a/b/c/d/e/note-14.txt",
+   "type": "f",
+   "size": 6781,
+   "sha256": "9fabad29abb019e6782f14919b49aa0480205db7739805cf147bb5f114ea17dc",
+   "mtime": 1400050498
+  },
+  {
+   "path": "/docs/note-15.txt",
+   "type": "f",
+   "size": 7120,
+   "sha256": "bc4eeff708e1738b0e71482067f2149cbd62bb1b443bd7f6b8d9230c89be5a5c",
+   "mtime": 1400054105
+  },
+  {
+   "path": "/docs/2014/note-16.txt",
+   "type": "f",
+   "size": 13383,
+   "sha256": "bb92f504315b86475bd438a4297148bae4364d17d78c83c7fa75504b46e31bab",
+   "mtime": 1400057712
+  },
+  {
+   "path": "/photos/2013-12/note-17.txt",
+   "type": "f",
+   "size": 5642,
+   "sha256": "baaec25f5e12aa8d8bdae4c67540e4e5a858658cb94088074dbd6184721bb667",
+   "mtime": 1400061319
+  },
+  {
+   "path": "/photos/2014-04/note-18.txt",
+   "type": "f",
+   "size": 11792,
+   "sha256": "54c5b20eb0cc89b15a13e426e4ff7e14d46eb7a53f20a3bebea844bedf3672fb",
+   "mtime": 1400064926
+  },
+  {
+   "path": "/a/b/c/d/e/note-19.txt",
+   "type": "f",
+   "size": 4808,
+   "sha256": "63066a04ecebc704dac7b4d44cd3b0f81050283408a060e8071342ffff721644",
+   "mtime": 1400068533
+  },
+  {
+   "path": "/docs/note-20.txt",
+   "type": "f",
+   "size": 12501,
+   "sha256": "9fbce495f841b87b138c733a124d98c25e009e8979ad03bec1d5d928f27b4bf1",
+   "mtime": 1400072140
+  },
+  {
+   "path": "/docs/2014/note-21.txt",
+   "type": "f",
+   "size": 3248,
+   "sha256": "71a1089b44a8faa6d99ec3e5a9c63f5e2ce480e015c12261e9e278a9232ed814",
+   "mtime": 1400075747
+  },
+  {
+   "path": "/photos/2013-12/note-22.txt",
+   "type": "f",
+   "size": 1228,
+   "sha256": "40ab97fadf9c7d417c844d46439450985842688bb8765f3b4ee6d676628060cb",
+   "mtime": 1400079354
+  },
+  {
+   "path": "/photos/2014-04/note-23.txt",
+   "type": "f",
+   "size": 11316,
+   "sha256": "c91a68173fcec66e3c01c90bf1e2df8c5acc357fdbc1c22c26d4acc0730f08b3",
+   "mtime": 1400082961
+  },
+  {
+   "path": "/a/b/c/d/e/note-24.txt",
+   "type": "f",
+   "size": 9026,
+   "sha256": "f76e486b261679053e44d9f8373163135cc04a63b357c33e37059e80d76dcbd5",
+   "mtime": 1400086568
+  },
+  {
+   "path": "/docs/note-25.txt",
+   "type": "f",
+   "size": 2786,
+   "sha256": "184dcd44c9c1c16845f076943d7070cfacba8cb249c09bc51473d0898f445bdf",
+   "mtime": 1400090175
+  },
+  {
+   "path": "/docs/2014/note-26.txt",
+   "type": "f",
+   "size": 2090,
+   "sha256": "44036e8d4a8e5c6781ce28b505d3b90429fc864797a4d17bc3f8959c7cc313ce",
+   "mtime": 1400093782
+  },
+  {
+   "path": "/photos/2013-12/note-27.txt",
+   "type": "f",
+   "size": 1872,
+   "sha256": "0964ab1ffb82f156b1bfe5d36802bee0b875d3fef88202b5829f161b8a26f9eb",
+   "mtime": 1400097389
+  },
+  {
+   "path": "/photos/2014-04/note-28.txt",
+   "type": "f",
+   "size": 11259,
+   "sha256": "0132b870b65524149ecb5ffc333ebe65e54a060a0edd02d2b07b31647c36c547",
+   "mtime": 1400100996
+  },
+  {
+   "path": "/a/b/c/d/e/note-29.txt",
+   "type": "f",
+   "size": 11063,
+   "sha256": "319bf1e54f59cd65faeb07a0ed98b27f74ff0befe41f16f7fd71eb6dbe7abae1",
+   "mtime": 1400104603
+  },
+  {
+   "path": "/docs/note-30.txt",
+   "type": "f",
+   "size": 1816,
+   "sha256": "03f32923bf1c13378b4e5405e3248691b8a310897a8aa54b44d05310fcaa80a7",
+   "mtime": 1400108210
+  },
+  {
+   "path": "/docs/2014/note-31.txt",
+   "type": "f",
+   "size": 5183,
+   "sha256": "b5b6101bbc70fc6f0d65776d1c644986df1acc6d9a7641c86834079ea2d8b494",
+   "mtime": 1400111817
+  },
+  {
+   "path": "/photos/2013-12/note-32.txt",
+   "type": "f",
+   "size": 13467,
+   "sha256": "518f20928c451f3d3cb1fc5a03f24706d06c1007eb9afec2f31ef73e294dc111",
+   "mtime": 1400115424
+  },
+  {
+   "path": "/photos/2014-04/note-33.txt",
+   "type": "f",
+   "size": 3240,
+   "sha256": "72dfb1f7ecac676a7a48a8fadd00f5732875b21f0e0f3ee536d5d5bb04432b9e",
+   "mtime": 1400119031
+  },
+  {
+   "path": "/a/b/c/d/e/note-34.txt",
+   "type": "f",
+   "size": 6595,
+   "sha256": "51eee03d7c27e47e4807d4315a31e408467ee2110cf4d0976e192a3f03909e06",
+   "mtime": 1400122638
+  },
+  {
+   "path": "/docs/note-35.txt",
+   "type": "f",
+   "size": 4546,
+   "sha256": "39c0102c647a006322586652d7415c513560e3f4dcc001ffbece15e505862a35",
+   "mtime": 1400126245
+  },
+  {
+   "path": "/docs/2014/note-36.txt",
+   "type": "f",
+   "size": 9097,
+   "sha256": "63eee690c3dde9a97e0dd1f65347b844de29f80ed832ce20ff0a3ba02cb0d4d6",
+   "mtime": 1400129852
+  },
+  {
+   "path": "/photos/2013-12/note-37.txt",
+   "type": "f",
+   "size": 12821,
+   "sha256": "349f44ffa02e995e9a489ba534f3154883269b4a1d3924ce71e5e1ab6f8af09b",
+   "mtime": 1400133459
+  },
+  {
+   "path": "/photos/2014-04/note-38.txt",
+   "type": "f",
+   "size": 9501,
+   "sha256": "6164d40b50c5ca794127bf28430888be99a0e4edb0d5d0ae7583b0d1ac46b529",
+   "mtime": 1400137066
+  },
+  {
+   "path": "/a/b/c/d/e/note-39.txt",
+   "type": "f",
+   "size": 2110,
+   "sha256": "c72e538d0d2279f4a364996d933fe089dca4f60c8332f45c7dadf7074a64a8ab",
+   "mtime": 1400140673
+  },
+  {
+   "path": "/photos/2013-12/img_0000.jpg",
+   "type": "f",
+   "size": 1558532,
+   "sha256": "9797a19c332b803e8e25686d932faa381a462846179647283d1a82d7b0a9c69f",
+   "mtime": 1400144280
+  },
+  {
+   "path": "/photos/2013-12/img_0001.jpg",
+   "type": "f",
+   "size": 1255940,
+   "sha256": "2535635e8df46440d6f4e94b8fb0b7a281b2d55ead8f342d2efb84ee3949fc75",
+   "mtime": 1400147887
+  },
+  {
+   "path": "/photos/2013-12/img_0002.jpg",
+   "type": "f",
+   "size": 1506052,
+   "sha256": "cadb72d7a19edfa8f1413dc534bf8566de80bae8cb471e5bf054b263ce935817",
+   "mtime": 1400151494
+  },
+  {
+   "path": "/photos/2014-04/img_0003.jpg",
+   "type": "f",
+   "size": 1375748,
+   "sha256": "2ef373b8438f02cd07f7881d8456bd570b1cba4f67dd4a3223bb9ac7a926bdd7",
+   "mtime": 1400155101
+  },
+  {
+   "path": "/photos/2014-04/img_0004.jpg",
+   "type": "f",
+   "size": 918532,
+   "sha256": "1f2a8376d7f3f1a366dee9d3ed4c294c7a9ee8b7ffe4c2292892d548969a366a",
+   "mtime": 1400158708
+  },
+  {
+   "path": "/photos/2014-04/img_0005.jpg",
+   "type": "f",
+   "size": 853764,
+   "sha256": "dcde2d2df79275cc1015a6f1735b7bf02035873e673034ee218636855b40aa52",
+   "mtime": 1400162315
+  },
+  {
+   "path": "/photos/Ausflüge Fertig/Bild ä 01.jpg",
+   "type": "f",
+   "size": 230404,
+   "sha256": "52d086951215b83711b136816533c1764c63cb78fb39ffc800845b80c9cb264d",
+   "mtime": 1400165922
+  },
+  {
+   "path": "/bin/random-0.bin",
+   "type": "f",
+   "size": 262144,
+   "sha256": "f3528e1d48f37a04ee7c44f01206a9a99cf80b1d2d36cf90d258eff19b4d564b",
+   "mtime": 1400169529
+  },
+  {
+   "path": "/bin/random-1.bin",
+   "type": "f",
+   "size": 262144,
+   "sha256": "e3b7245bd656a752f201812c5f8a0e0dd85809ff0d8792db8b2ad9c08e008783",
+   "mtime": 1400173136
+  },
+  {
+   "path": "/video/big.mts",
+   "type": "f",
+   "size": 47185920,
+   "sha256": "6367fab1aa4f460c6aed021e4da6d41876f2592a9f15a464db4d274941fc24c6",
+   "mtime": 1400176743
+  },
+  {
+   "path": "/docs/empty.txt",
+   "type": "f",
+   "size": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "mtime": 1400180350
+  },
+  {
+   "path": "/docs/tiny.txt",
+   "type": "f",
+   "size": 55,
+   "sha256": "33c6c70490afb7880028f36cad5cd00b80e9c9fa69cf2411f00a1e0ca842df5e",
+   "mtime": 1400183957
+  },
+  {
+   "path": "/.cache/thumb.png",
+   "type": "f",
+   "size": 2052,
+   "sha256": "69838942d3193f65ab8f5c5a23f89906a5cfe4b32cde55d1a699a01f01d069d0",
+   "mtime": 1400187564
+  },
+  {
+   "path": "/photos/latest",
+   "type": "l",
+   "target": "2014-04"
+  }
+ ],
+ "features": {
+  "feature@async_destroy": "enabled",
+  "feature@empty_bpobj": "active",
+  "feature@lz4_compress": "active",
+  "feature@multi_vdev_crash_dump": "enabled",
+  "feature@spacemap_histogram": "active",
+  "feature@enabled_txg": "active",
+  "feature@hole_birth": "active",
+  "feature@extensible_dataset": "active",
+  "feature@embedded_data": "active",
+  "feature@bookmarks": "enabled",
+  "feature@filesystem_limits": "enabled",
+  "feature@large_blocks": "enabled",
+  "feature@large_dnode": "enabled",
+  "feature@sha512": "enabled",
+  "feature@skein": "enabled",
+  "feature@edonr": "enabled",
+  "feature@userobj_accounting": "active",
+  "feature@encryption": "enabled",
+  "feature@project_quota": "active",
+  "feature@device_removal": "enabled",
+  "feature@obsolete_counts": "enabled",
+  "feature@zpool_checkpoint": "enabled",
+  "feature@spacemap_v2": "active",
+  "feature@allocation_classes": "enabled",
+  "feature@resilver_defer": "enabled",
+  "feature@bookmark_v2": "enabled",
+  "feature@redaction_bookmarks": "enabled",
+  "feature@redacted_datasets": "enabled",
+  "feature@bookmark_written": "enabled",
+  "feature@log_spacemap": "active",
+  "feature@livelist": "enabled",
+  "feature@device_rebuild": "enabled",
+  "feature@zstd_compress": "enabled",
+  "feature@draid": "enabled",
+  "feature@zilsaxattr": "enabled",
+  "feature@head_errlog": "active",
+  "feature@blake3": "enabled",
+  "feature@block_cloning": "enabled",
+  "feature@vdev_zaps_v2": "active"
+ },
+ "datasets": {
+  "mos": {
+   "type": "META",
+   "id": 0,
+   "objects": 61,
+   "size": "523K"
+  },
+  "fx-raidz1-4/home": {
+   "type": "ZPL",
+   "id": 151,
+   "objects": 74,
+   "size": "5.87M",
+   "rootbp": "DVA[0]=<0:ce000:2000> DVA[1]=<0:20a0000:2000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=15L/15P fill=74 cksum=0000000daeda7b85:000024ae38118a32:003440d37bab040e:349d7248b00d828c",
+   "dvas": [
+    {
+     "vdev": 0,
+     "offset": 843776,
+     "asize": 8192
+    },
+    {
+     "vdev": 0,
+     "offset": 34209792,
+     "asize": 8192
+    }
+   ],
+   "lsize": 4096,
+   "psize": 4096,
+   "birth": 15,
+   "objset_block": "fletcher4 uncompressed unencrypted"
+  },
+  "fx-raidz1-4": {
+   "type": "ZPL",
+   "id": 54,
+   "objects": 7,
+   "size": "140K"
+  }
+ },
+ "newest_txg": 29,
+ "target": "fx-raidz1-4/home",
+ "meta_dnode": {
+  "nlevels": 6,
+  "indirect_block_size": 131072,
+  "data_block_size": 16384
+ },
+ "meta_dnode_blocks": [
+  "0 L5      0:ca000:2000 20000L/1000P F=74 B=15/15 cksum=0000008652795eba:0001ee35503997bc:038fb419c07641e5:646067d53b4a98a1",
+  "0  L4     0:c8000:2000 20000L/1000P F=74 B=15/15 cksum=00000085fa57e2db:0001ecdb6c176c23:038d0c99001e5b9d:60e583024b7d8380",
+  "0   L3    0:8130000:2000 20000L/1000P F=74 B=15/15 cksum=00000086349fc680:0001edc869863c61:038eeea185f5697d:63736b9d36df3f5a",
+  "0    L2   0:4652000:2000 20000L/1000P F=74 B=15/15 cksum=0000008581208c9c:0001eb00b22cb9ad:03896a2a9ea05c63:5c24b4ffc846ee7b",
+  "0     L1  0:c0fc000:2000 20000L/1000P F=74 B=15/15 cksum=000000907945322a:00020977c824ea4b:03b04d54fe5030aa:77df13246f5afcdf",
+  "0      L0 0:464e000:2000 4000L/1000P F=31 B=15/15 cksum=0000009fce6524ce:0001958577a95bbf:023a133bb4d7dce7:422bfc608da70cc4",
+  "4000      L0 0:4650000:2000 4000L/1000P F=31 B=15/15 cksum=000000b54145c3ee:0001b3b6815732fc:024d7086ad81be43:42f6df1569140993",
+  "10000      L0 0:464c000:2000 4000L/1000P F=12 B=15/15 cksum=0000004d2d883c26:0000fc0b56d36957:01a2f49d40806a25:d839aa365bd11b54"
+ ],
+ "layout": "raidz1",
+ "damage": {
+  "spec": null,
+  "note": "raidz: physical location of a DVA needs the raidz map; damaged variant later"
+ },
+ "image_sha256": {
+  "d0.img": "b4fb90da1b5e60bdbaca8461211b892dd816d856f56ede6722e8642ae976bee6",
+  "d1.img": "a0586bfa42dbbe67104e4312cfc098fcf57385c56f0c4d41550a56eb86e14922",
+  "d2.img": "725521d2594c31a9780a616b956b39e066f55e060f0f243d92172470371e70c6",
+  "d3.img": "67b84099bc79f307b933bd48f723172e8d7961855ab3164c372f39e0045cedaf"
+ },
+ "seconds": 19.9
+}

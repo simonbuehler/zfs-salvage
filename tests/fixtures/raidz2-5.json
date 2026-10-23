@@ -1,0 +1,511 @@
+{
+ "variant": "raidz2-5",
+ "pool": "fx-raidz2-5",
+ "zfs_version": "zfs-2.2.2-0ubuntu9.5",
+ "create": [
+  "-o",
+  "ashift=12",
+  "raidz2",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4"
+ ],
+ "devices": [
+  "d0.img",
+  "d1.img",
+  "d2.img",
+  "d3.img",
+  "d4.img"
+ ],
+ "device_size": 134217728,
+ "label_start": 4194304,
+ "files": [
+  {
+   "path": "/docs/note-00.txt",
+   "type": "f",
+   "size": 12615,
+   "sha256": "5b78ea54d963e2a42c0f18e8a4ba52d2432e3e33f70f3612269234b1dc765e7d",
+   "mtime": 1400000000
+  },
+  {
+   "path": "/docs/2014/note-01.txt",
+   "type": "f",
+   "size": 5906,
+   "sha256": "5ce9753833073b3aa7d87f23e640f768b2d579f8972a8e5e8bdb6c4f4a794e5d",
+   "mtime": 1400003607
+  },
+  {
+   "path": "/photos/2013-12/note-02.txt",
+   "type": "f",
+   "size": 11273,
+   "sha256": "716275904d24223af16697d537411a9062dfe3b13a2bc0c287c681d4c1c38252",
+   "mtime": 1400007214
+  },
+  {
+   "path": "/photos/2014-04/note-03.txt",
+   "type": "f",
+   "size": 4883,
+   "sha256": "d51c5d19b2429ebca1f8678e09e1fe83f4788299eea415deeba08746cacfaf2c",
+   "mtime": 1400010821
+  },
+  {
+   "path": "/a/b/c/d/e/note-04.txt",
+   "type": "f",
+   "size": 8973,
+   "sha256": "8ab2ad369a8721db3a0dc971e1ae97d78f5806460796ec6873470d3390ab5d4f",
+   "mtime": 1400014428
+  },
+  {
+   "path": "/docs/note-05.txt",
+   "type": "f",
+   "size": 3933,
+   "sha256": "1f94145e2fa8f1e21e6ffa0ce9daa1044915fca54412d750797ca07a5ad2dd91",
+   "mtime": 1400018035
+  },
+  {
+   "path": "/docs/2014/note-06.txt",
+   "type": "f",
+   "size": 6132,
+   "sha256": "cab6ce8f849942a6c6b74a8770c54a99117acca22cbc18c113c948ef795cf6d9",
+   "mtime": 1400021642
+  },
+  {
+   "path": "/photos/2013-12/note-07.txt",
+   "type": "f",
+   "size": 11948,
+   "sha256": "9111f469c7320e1dd6b88bb504a398cd611976da5f1cf18694a3c5259176092e",
+   "mtime": 1400025249
+  },
+  {
+   "path": "/photos/2014-04/note-08.txt",
+   "type": "f",
+   "size": 10730,
+   "sha256": "71f75c84a62ea81e83318444e6c2f7bb10204b87bea8104b670afef9d6dcdc6a",
+   "mtime": 1400028856
+  },
+  {
+   "path": "/a/b/c/d/e/note-09.txt",
+   "type": "f",
+   "size": 7308,
+   "sha256": "634a1d028735cf2c213f31cd6033d75647856e7d0e17981e212963bc457f95d0",
+   "mtime": 1400032463
+  },
+  {
+   "path": "/docs/note-10.txt",
+   "type": "f",
+   "size": 7148,
+   "sha256": "1daf50e94438a9cab6662191ae380ebc0da7cbad6ec6c948db73c644612dfb3b",
+   "mtime": 1400036070
+  },
+  {
+   "path": "/docs/2014/note-11.txt",
+   "type": "f",
+   "size": 2407,
+   "sha256": "0e1c837333b9e5829538ea7f40cf7ed7142be535321e5bf3c891e9407bec63c3",
+   "mtime": 1400039677
+  },
+  {
+   "path": "/photos/2013-12/note-12.txt",
+   "type": "f",
+   "size": 864,
+   "sha256": "20bc87c9ea4494c19d3ead4f51fb57cfcd11122b4860073c6a8578ae0c610d25",
+   "mtime": 1400043284
+  },
+  {
+   "path": "/photos/2014-04/note-13.txt",
+   "type": "f",
+   "size": 460,
+   "sha256": "0055ef2653e605da39398f93d11b0d59d9e398fbe1489ba7a4d10448ac9a9695",
+   "mtime": 1400046891
+  },
+  {
+   "path": "/a/b/c/d/e/note-14.txt",
+   "type": "f",
+   "size": 8209,
+   "sha256": "0c9444cfa6d8d5719addec12a49f9b45153254510b104ac121a9e9ec1c807af2",
+   "mtime": 1400050498
+  },
+  {
+   "path": "/docs/note-15.txt",
+   "type": "f",
+   "size": 11315,
+   "sha256": "722ce9d155137ab818ec25cfc1f3c59753d4d5502b90453ab2e9f765a1ed5a25",
+   "mtime": 1400054105
+  },
+  {
+   "path": "/docs/2014/note-16.txt",
+   "type": "f",
+   "size": 10094,
+   "sha256": "5c632bd00f00adc0d703c41b3fa1c4dae1df2d23b0b34381d9fa2a4ed000d42e",
+   "mtime": 1400057712
+  },
+  {
+   "path": "/photos/2013-12/note-17.txt",
+   "type": "f",
+   "size": 7659,
+   "sha256": "aa74666c13a4e3a59c289b81f4142cfd0a2793e537ecf4dd6af0d20e789f9e03",
+   "mtime": 1400061319
+  },
+  {
+   "path": "/photos/2014-04/note-18.txt",
+   "type": "f",
+   "size": 13487,
+   "sha256": "f40715eb2135b338ce2c6813b274d1e7f29b05ce4551a0161ba696f362bb717f",
+   "mtime": 1400064926
+  },
+  {
+   "path": "/a/b/c/d/e/note-19.txt",
+   "type": "f",
+   "size": 2615,
+   "sha256": "963adcdccacf3ed5ea72ab3aaf8c3a165a324afb86a7bbaff272bf7c469a4694",
+   "mtime": 1400068533
+  },
+  {
+   "path": "/docs/note-20.txt",
+   "type": "f",
+   "size": 2286,
+   "sha256": "c02b1574e1d8eede6f0ac8fb69dc0d1225b787b186498e932fa0ae3c78325b2e",
+   "mtime": 1400072140
+  },
+  {
+   "path": "/docs/2014/note-21.txt",
+   "type": "f",
+   "size": 6584,
+   "sha256": "643ce3846ce5b6a4c46c4ffe3bb863ea46aa75c5ebd686b3f25568fb49c93a2c",
+   "mtime": 1400075747
+  },
+  {
+   "path": "/photos/2013-12/note-22.txt",
+   "type": "f",
+   "size": 13238,
+   "sha256": "93391c6fd1cd7cb6ecde8636b749000fe0d58f0a7d3da3b56ad646147a63740b",
+   "mtime": 1400079354
+  },
+  {
+   "path": "/photos/2014-04/note-23.txt",
+   "type": "f",
+   "size": 5731,
+   "sha256": "e4e16853852ca342025c30623e5b9fec93cf04284ee1f6da3f45ee212c6aeead",
+   "mtime": 1400082961
+  },
+  {
+   "path": "/a/b/c/d/e/note-24.txt",
+   "type": "f",
+   "size": 11329,
+   "sha256": "92ae94feee4a3ee29e052b5a1b2513143b76ae0b709c9feae1dfe624cbd1155e",
+   "mtime": 1400086568
+  },
+  {
+   "path": "/docs/note-25.txt",
+   "type": "f",
+   "size": 1768,
+   "sha256": "985fa2ab96974c62d55c27f04cc2c210228693e80b04971020a3827ef5fb46ac",
+   "mtime": 1400090175
+  },
+  {
+   "path": "/docs/2014/note-26.txt",
+   "type": "f",
+   "size": 3214,
+   "sha256": "98ddeb1421ba39dbef7cde7e79969d374e22c62499da023666b7deaa982287af",
+   "mtime": 1400093782
+  },
+  {
+   "path": "/photos/2013-12/note-27.txt",
+   "type": "f",
+   "size": 6876,
+   "sha256": "480762024efb661bed6e4ec0a93f4884ada06551ac9beb33e50412d13129737c",
+   "mtime": 1400097389
+  },
+  {
+   "path": "/photos/2014-04/note-28.txt",
+   "type": "f",
+   "size": 9164,
+   "sha256": "d0893c4ae6ee750a3aeb3a583106dca73f392d08a0b22e4478e024bea18a3c7c",
+   "mtime": 1400100996
+  },
+  {
+   "path": "/a/b/c/d/e/note-29.txt",
+   "type": "f",
+   "size": 11156,
+   "sha256": "ca724a74645f826661905007c134f4490fea5cf82281923c7b631c4081a52718",
+   "mtime": 1400104603
+  },
+  {
+   "path": "/docs/note-30.txt",
+   "type": "f",
+   "size": 2510,
+   "sha256": "b62ea409773afa3dee25f819386dc2211b0bfbad83493495c4c3b784909e6322",
+   "mtime": 1400108210
+  },
+  {
+   "path": "/docs/2014/note-31.txt",
+   "type": "f",
+   "size": 2559,
+   "sha256": "da8c966748d8e135bee9256054db3722492e0a6a624bfa7b612028b6ef5b5cab",
+   "mtime": 1400111817
+  },
+  {
+   "path": "/photos/2013-12/note-32.txt",
+   "type": "f",
+   "size": 4315,
+   "sha256": "9c4d91c2b85ce97da38a186162f0beb781be2028f6e7fe5aba33927d9a228f1b",
+   "mtime": 1400115424
+  },
+  {
+   "path": "/photos/2014-04/note-33.txt",
+   "type": "f",
+   "size": 7569,
+   "sha256": "3b70b31ad3bde397300d124223888bf136f6fdb50343b26564a2e25f840a3be1",
+   "mtime": 1400119031
+  },
+  {
+   "path": "/a/b/c/d/e/note-34.txt",
+   "type": "f",
+   "size": 8273,
+   "sha256": "70ef7d0bb395e3f81bbb40f777a598d22cc380be5aae7c8b4710f221107c5681",
+   "mtime": 1400122638
+  },
+  {
+   "path": "/docs/note-35.txt",
+   "type": "f",
+   "size": 12929,
+   "sha256": "ed8a53dd19d6a69db3527637dd583645c2779cd5a37b1896e5adcce1ab0e311b",
+   "mtime": 1400126245
+  },
+  {
+   "path": "/docs/2014/note-36.txt",
+   "type": "f",
+   "size": 11060,
+   "sha256": "daf677fec164b392f8519258c4a3ea77e1c4a97f979e7b6b1baccc6ff321cb34",
+   "mtime": 1400129852
+  },
+  {
+   "path": "/photos/2013-12/note-37.txt",
+   "type": "f",
+   "size": 4547,
+   "sha256": "c6921dc14bee2e05ea8c73c041aa1786c55ad258253a89654ab93b440e5201ef",
+   "mtime": 1400133459
+  },
+  {
+   "path": "/photos/2014-04/note-38.txt",
+   "type": "f",
+   "size": 9276,
+   "sha256": "1c8f4e72ef4a17d8594b21ab8d5e63fc124b6bfede34712b4b6e1f78547ddd0e",
+   "mtime": 1400137066
+  },
+  {
+   "path": "/a/b/c/d/e/note-39.txt",
+   "type": "f",
+   "size": 2871,
+   "sha256": "fb7a01d0550209b6577eb9043c47395f55b5aef7ac5b008588d256bd733fad59",
+   "mtime": 1400140673
+  },
+  {
+   "path": "/photos/2013-12/img_0000.jpg",
+   "type": "f",
+   "size": 1225476,
+   "sha256": "46eacaa354b7c660062c8085c525f248fa69c69b12d4fca277a6bd99e4049431",
+   "mtime": 1400144280
+  },
+  {
+   "path": "/photos/2013-12/img_0001.jpg",
+   "type": "f",
+   "size": 1010180,
+   "sha256": "3723ef01697ae88609bf308159220b1277ac933c09d665a1f31235618fcfea5c",
+   "mtime": 1400147887
+  },
+  {
+   "path": "/photos/2013-12/img_0002.jpg",
+   "type": "f",
+   "size": 926212,
+   "sha256": "e4b9af2e7140c29680fc600c742e6b9c92475f0852eec552981b0638ff435ad4",
+   "mtime": 1400151494
+  },
+  {
+   "path": "/photos/2014-04/img_0003.jpg",
+   "type": "f",
+   "size": 1099524,
+   "sha256": "6e3e2c84a18f480b2b5c10dc21a97c78d6bb153b037648b0a79f02b73d543209",
+   "mtime": 1400155101
+  },
+  {
+   "path": "/photos/2014-04/img_0004.jpg",
+   "type": "f",
+   "size": 922884,
+   "sha256": "d05fb1a8e486ba85ed0183b6d3a8c658c5ff384e3c244f5d3ab28ea7d1e3309e",
+   "mtime": 1400158708
+  },
+  {
+   "path": "/photos/2014-04/img_0005.jpg",
+   "type": "f",
+   "size": 1573636,
+   "sha256": "faec34d11363e23464b4d70d4084a3019b156b333ea5c6caa9dbdc638b986694",
+   "mtime": 1400162315
+  },
+  {
+   "path": "/photos/Ausflüge Fertig/Bild ä 01.jpg",
+   "type": "f",
+   "size": 230404,
+   "sha256": "52d086951215b83711b136816533c1764c63cb78fb39ffc800845b80c9cb264d",
+   "mtime": 1400165922
+  },
+  {
+   "path": "/bin/random-0.bin",
+   "type": "f",
+   "size": 262144,
+   "sha256": "0653ac5b4df2741237c9650b503a0522b851a7a9c8555857cf4c60423d2942fa",
+   "mtime": 1400169529
+  },
+  {
+   "path": "/bin/random-1.bin",
+   "type": "f",
+   "size": 262144,
+   "sha256": "4b5552eedd919e2ac9d63261e339ee1692c0271fa794216a4c5bf995604f27be",
+   "mtime": 1400173136
+  },
+  {
+   "path": "/video/big.mts",
+   "type": "f",
+   "size": 47185920,
+   "sha256": "6367fab1aa4f460c6aed021e4da6d41876f2592a9f15a464db4d274941fc24c6",
+   "mtime": 1400176743
+  },
+  {
+   "path": "/docs/empty.txt",
+   "type": "f",
+   "size": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "mtime": 1400180350
+  },
+  {
+   "path": "/docs/tiny.txt",
+   "type": "f",
+   "size": 55,
+   "sha256": "33c6c70490afb7880028f36cad5cd00b80e9c9fa69cf2411f00a1e0ca842df5e",
+   "mtime": 1400183957
+  },
+  {
+   "path": "/.cache/thumb.png",
+   "type": "f",
+   "size": 2052,
+   "sha256": "69838942d3193f65ab8f5c5a23f89906a5cfe4b32cde55d1a699a01f01d069d0",
+   "mtime": 1400187564
+  },
+  {
+   "path": "/photos/latest",
+   "type": "l",
+   "target": "2014-04"
+  }
+ ],
+ "features": {
+  "feature@async_destroy": "enabled",
+  "feature@empty_bpobj": "active",
+  "feature@lz4_compress": "active",
+  "feature@multi_vdev_crash_dump": "enabled",
+  "feature@spacemap_histogram": "active",
+  "feature@enabled_txg": "active",
+  "feature@hole_birth": "active",
+  "feature@extensible_dataset": "active",
+  "feature@embedded_data": "active",
+  "feature@bookmarks": "enabled",
+  "feature@filesystem_limits": "enabled",
+  "feature@large_blocks": "enabled",
+  "feature@large_dnode": "enabled",
+  "feature@sha512": "enabled",
+  "feature@skein": "enabled",
+  "feature@edonr": "enabled",
+  "feature@userobj_accounting": "active",
+  "feature@encryption": "enabled",
+  "feature@project_quota": "active",
+  "feature@device_removal": "enabled",
+  "feature@obsolete_counts": "enabled",
+  "feature@zpool_checkpoint": "enabled",
+  "feature@spacemap_v2": "active",
+  "feature@allocation_classes": "enabled",
+  "feature@resilver_defer": "enabled",
+  "feature@bookmark_v2": "enabled",
+  "feature@redaction_bookmarks": "enabled",
+  "feature@redacted_datasets": "enabled",
+  "feature@bookmark_written": "enabled",
+  "feature@log_spacemap": "active",
+  "feature@livelist": "enabled",
+  "feature@device_rebuild": "enabled",
+  "feature@zstd_compress": "enabled",
+  "feature@draid": "enabled",
+  "feature@zilsaxattr": "enabled",
+  "feature@head_errlog": "active",
+  "feature@blake3": "enabled",
+  "feature@block_cloning": "enabled",
+  "feature@vdev_zaps_v2": "active"
+ },
+ "datasets": {
+  "mos": {
+   "type": "META",
+   "id": 0,
+   "objects": 56,
+   "size": "533K"
+  },
+  "fx-raidz2-5/home": {
+   "type": "ZPL",
+   "id": 387,
+   "objects": 74,
+   "size": "7.02M",
+   "rootbp": "DVA[0]=<0:dd1000:3000> DVA[1]=<0:42eb000:3000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=15L/15P fill=74 cksum=000000113998c9d7:00002ed4b25d1e44:0043dc87aa2c7b2f:4598bb51489079f3",
+   "dvas": [
+    {
+     "vdev": 0,
+     "offset": 14487552,
+     "asize": 12288
+    },
+    {
+     "vdev": 0,
+     "offset": 70168576,
+     "asize": 12288
+    }
+   ],
+   "lsize": 4096,
+   "psize": 4096,
+   "birth": 15,
+   "objset_block": "fletcher4 uncompressed unencrypted"
+  },
+  "fx-raidz2-5": {
+   "type": "ZPL",
+   "id": 54,
+   "objects": 7,
+   "size": "170K"
+  }
+ },
+ "newest_txg": 29,
+ "target": "fx-raidz2-5/home",
+ "meta_dnode": {
+  "nlevels": 6,
+  "indirect_block_size": 131072,
+  "data_block_size": 16384
+ },
+ "meta_dnode_blocks": [
+  "0 L5      0:dcb000:3000 20000L/1000P F=74 B=15/15 cksum=00000086ca60d5a3:0001f00fd4660a76:0393601a87df4306:693b38aba10a6feb",
+  "0  L4     0:dc8000:3000 20000L/1000P F=74 B=15/15 cksum=00000086e5c32ecc:0001f07de16553a1:03943d5de0f5b081:6a63f9026f4f4e6c",
+  "0   L3    0:dc5000:3000 20000L/1000P F=74 B=15/15 cksum=000000868b79951d:0001ef6bcf1f3cdd:0392ac693543639c:68f36282e22c8fde",
+  "0    L2   0:dc2000:3000 20000L/1000P F=74 B=15/15 cksum=00000085f8d7384a:0001ecda04e210c8:038d12f46f609b12:60fa2de02e555062",
+  "0     L1  0:dbf000:3000 20000L/1000P F=74 B=15/15 cksum=00000091ac9ef39b:000206c465c32815:039f159e57159944:549430aa2660d536",
+  "0      L0 0:db9000:3000 4000L/1000P F=31 B=15/15 cksum=000000a125f349b1:0001947068c80888:022b85b2fca570a7:234be449e2288bb3",
+  "4000      L0 0:dbc000:3000 4000L/1000P F=31 B=15/15 cksum=000000b50f02bc1f:0001c09a276e1e65:026c048812c7ce3c:6b255dc23ca8db2a",
+  "10000      L0 0:db3000:3000 4000L/1000P F=7 B=15/15 cksum=0000003b2ab2ae2c:0000cc98a985211f:0164983a2947e8f8:a1b27990f4b0b5af",
+  "20000      L0 0:db6000:3000 4000L/1000P F=5 B=15/15 cksum=000000275b0d3863:00008eb053bfe021:0103e388668122f3:3d0ffd1f98289c75"
+ ],
+ "layout": "raidz2",
+ "damage": {
+  "spec": null,
+  "note": "raidz: physical location of a DVA needs the raidz map; damaged variant later"
+ },
+ "image_sha256": {
+  "d0.img": "5ab33b179a04ff577efe66c33e511bf3f8e15b40c9da98ca2a79e2465f155aa7",
+  "d1.img": "9ea75289ecd7487575ac0c8d870081a869462c578cdd11ace1696dc1554eaf29",
+  "d2.img": "3f08cfb580302fb713d7b53d0d015215c4dc82bc43071852d1f718804009a638",
+  "d3.img": "e51586ec61dce07beaa0f1e33167063a92117f11edcd02c97bfee115aad3a911",
+  "d4.img": "f9631295a87acf3dfb7e38c3389e8a9195f7f6d7e6366b5f459aff750c950064"
+ },
+ "seconds": 24.1
+}
