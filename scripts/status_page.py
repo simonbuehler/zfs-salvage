@@ -96,21 +96,52 @@ STATUS = {'good': ('#0ca30c', '✓'), 'warning': ('#fab219', '⟳'), 'serious': 
           'critical': ('#d03b3b', '✗'), 'neutral': ('var(--mut)', '·')}
 
 
-def chain_svg(state):
-    """ZFS chain uberblock -> ... -> file contents with states; scanner detour around the break."""
+def diagnosis():
+    """What make-case found out about where the way to the target's files is broken (case['diagnosis']); cases written by
+    hand before that existed carry TARGET['break'] instead."""
+    diag = CASE.get('diagnosis')
+    brk = TARGET.get('break')
+    if diag is None and brk:
+        diag = {'situation': 'objset', 'uberblock_txg': CASE.get('crash_txg'), 'mos_txg': CASE.get('open_txg'),
+                'dataset_listed': True, 'objset_birth': brk.get('birth_txg'), 'objset_error': brk.get('reason')}
+    return diag or {}
+
+
+def chain_nodes(state):
+    """The boxes of the chain uberblock -> ... -> file contents, each with the state the facts support. Nothing is
+    drawn as broken unless the diagnosis says so."""
     ds = TARGET.get('dataset', 'target dataset')
-    brk = TARGET.get('break', {})
-    first_open = min((e['txg'] for e in CASE.get('timeline', [])), default=None)
-    nodes = [
-        ('Uberblock', f'TXG {CASE.get("crash_txg", "?")} · last state before the crash', 'good',
-         'Entry point of the pool; ring buffer of the last 128 states'),
-        ('Pool metadata (MOS)', f'opens at TXG {CASE.get("open_txg", "?")}', 'good',
-         'Meta Object Set: directory of all datasets'),
-        (f'Dataset {ds}', f'MOS obj {TARGET.get("mos_dir_obj", "?")}/{TARGET.get("mos_dataset_obj", "?")} · '
-                          f'{TARGET.get("size_hint", "")} · {num(TARGET.get("expected_objects", 0))} objects', 'good',
-         'Dataset entry with size, snapshots and the pointer to its objset block'),
-        (f'Objset block', f'TXG {brk.get("birth_txg", "?")} · {brk.get("reason", "unreadable")}', 'critical',
-         'This is where the chain breaks'),
+    d = diagnosis()
+    sit = d.get('situation')
+    ub = d.get('uberblock_txg') or CASE.get('crash_txg')
+    ub_sub = (f'TXG {ub} · ' + ('last state before the crash' if CASE.get('crash_txg') else 'newest uberblock')) if ub else '–'
+    mos = d.get('mos_txg') or CASE.get('open_txg')
+    if sit == 'mos':
+        mos_node = ('Pool metadata (MOS)', 'unreadable at every uberblock', 'critical', 'Meta Object Set: directory of all datasets. This is where the chain breaks')
+    else:
+        mos_node = ('Pool metadata (MOS)', f'readable at TXG {mos}' if mos else '–', 'good' if mos else 'neutral',
+                    'Meta Object Set: directory of all datasets')
+    info = ' · '.join(x for x in (f'MOS obj {TARGET["mos_dir_obj"]}/{TARGET["mos_dataset_obj"]}' if TARGET.get('mos_dir_obj') else '',
+                                  TARGET.get('size_hint', ''),
+                                  f'{num(TARGET["expected_objects"])} objects' if TARGET.get('expected_objects') else '') if x)
+    if sit == 'mos':
+        ds_node = (f'Dataset {ds}', '–', 'neutral', 'Dataset entry with size, snapshots and the pointer to its objset block')
+    elif sit == 'missing':
+        ds_node = (f'Dataset {ds}', "not in the pool's list – destroyed, or the name is wrong", 'critical',
+                   'Dataset entry with size, snapshots and the pointer to its objset block. This is where the chain breaks')
+    else:
+        ds_node = (f'Dataset {ds}', info or ('listed' if d.get('dataset_listed') else '–'), 'good' if d else 'neutral',
+                   'Dataset entry with size, snapshots and the pointer to its objset block')
+    if sit == 'objset':
+        os_node = ('Objset block', f'TXG {d.get("objset_birth") or "?"} · {d.get("objset_error") or "unreadable"}', 'critical',
+                   'This is where the chain breaks')
+    elif sit == 'intact':
+        os_node = ('Objset block', f'TXG {d.get("objset_birth") or "?"} · readable', 'good', 'The dataset opens normally')
+    else:
+        os_node = ('Objset block', '–', 'neutral', 'Root of the dataset: the first block of its file tree')
+    return [
+        ('Uberblock', ub_sub, 'good' if ub else 'neutral', 'Entry point of the pool; ring buffer of the last 128 states'),
+        mos_node, ds_node, os_node,
         (f'Dnode tree L{L6_LEVEL + 1} → L1', state['tree'][1], state['tree'][0],
          'Pointer tree to all file entries – the scanner finds it directly on disk'),
         ('File entries (dnodes)', state['dnodes'][1], state['dnodes'][0],
@@ -118,6 +149,17 @@ def chain_svg(state):
         ('File contents', state['files'][1], state['files'][0],
          'Blocks with their own checksums – every block is verified individually'),
     ]
+
+
+def chain_break(nodes):
+    """Index of the first broken box before the dnode tree, or None."""
+    return next((i for i, n in enumerate(nodes[:4]) if n[2] == 'critical'), None)
+
+
+def chain_svg(state):
+    """ZFS chain uberblock -> ... -> file contents with states; the scanner's detour is drawn around a real break only."""
+    nodes = chain_nodes(state)
+    brk = chain_break(nodes)
     w, nh, gap, x = 560, 54, 22, 20
     h = len(nodes) * (nh + gap)
     out = [f'<svg viewBox="0 0 {w + 200} {h}" role="img" aria-label="ZFS chain from uberblock to files" '
@@ -138,7 +180,10 @@ def chain_svg(state):
             dash = ' stroke-dasharray="4 4"' if st == 'critical' or nodes[i + 1][2] == 'critical' else ''
             out.append(f'<line x1="{x + 28}" y1="{y + nh}" x2="{x + 28}" y2="{y + nh + gap - 2}" '
                        f'stroke="var(--mut)" stroke-width="2"{dash} marker-end="url(#ar)"/>')
-    y2, y4, xr = 2 * (nh + gap) + nh / 2, 4 * (nh + gap) + nh / 2, x + w + 30
+    if brk is None:
+        out.append('</svg>')
+        return ''.join(out)
+    y2, y4, xr = max(brk - 1, 0) * (nh + gap) + nh / 2, 4 * (nh + gap) + nh / 2, x + w + 30
     out.append(f'<path d="M{x + w},{y2} H{xr} V{y4} H{x + w + 4}" fill="none" stroke="{SEQ[4]}" stroke-width="2" '
                f'stroke-dasharray="6 4" marker-end="url(#ar)"/>'
                f'<text x="{xr + 8}" y="{(y2 + y4) / 2 - 6}" font-size="12" fill="var(--fg)" font-weight="600">Detour</text>'
@@ -363,6 +408,11 @@ def main():
         crash_note = (f'<p class="mut" style="margin:-6px 4px 0">After its last change ({txg_label(goal)}) the dataset '
                       f'was not modified until the crash ({txg_label(CASE["crash_txg"])}). A TXG is a pool-wide '
                       f'transaction (~every 5 s while anything is written), not every TXG touches the dataset.</p>')
+    broken = chain_break(chain_nodes(chain_state(cands, scanning))) is not None
+    chain_title = ' – and where the chain breaks' if broken else ''
+    chain_text = ('The scanner bypasses the broken step and finds the pointer tree directly on disk.' if broken else
+                  'Nothing on the way to your files is known to be broken; the scan also finds the older states of the file system.'
+                  if diagnosis() else 'The scanner finds the pointer tree directly on disk, whatever is broken above it.')
     scan_head = (f'<b>{100 * frac:.1f} %</b> · {len(done)} of {n} chunks · expected to finish {eta_txt}' if scanning
                  else f'<b>Scan complete</b> · {n} chunks')
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -406,8 +456,8 @@ h3{{font-size:14px;margin:14px 0 6px}}
 <div>{scan_head}</div><div class="mut">{html.escape(cur_txt)} · disk temperature {temps}</div>
 <details style="margin-top:8px"><summary>Disk map – one tile per {gib} GiB, colour = amount of ZFS metadata found</summary>
 {disk_map(n, step, done_counts, cur_idx, cur_frac)}</details></div>
-<div class="card" id="chain"><b>How ZFS finds your files – and where the chain breaks</b>
-<p class="mut">Every step points to the next one and carries its checksum. The scanner bypasses the broken step and finds the pointer tree directly on disk. Hover over a box for an explanation.</p>
+<div class="card" id="chain"><b>How ZFS finds your files{chain_title}</b>
+<p class="mut">Every step points to the next one and carries its checksum. {chain_text} Hover over a box for an explanation.</p>
 {chain_svg(chain_state(cands, scanning))}
 <p class="mut">✓ intact and proven by checksum · ✗ destroyed · ⟳ being searched · · not reached yet. TXG = transaction group number, higher is newer.</p></div>
 <details class="card" id="details"><summary>Scan details</summary><div id="det">

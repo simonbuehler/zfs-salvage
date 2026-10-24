@@ -28,12 +28,33 @@ It does **not** help when the data blocks themselves are overwritten or the disk
 
 ## How it works
 
+Every step of ZFS points to the next one and carries its checksum. Normally ZFS walks this chain from the top.
+If one step is destroyed, ZFS stops there and the files below it are unreachable, although they are still on the disk.
+zfs-salvage goes around the broken step:
+
 ```
-ZFS normally:  uberblock → MOS → dataset → objset block → dnode tree (L6…L0) → dnodes → file data
-                                               ✗ destroyed
-zfs-salvage:   scan disk → find dnode-tree roots (L6 / objset blocks) → verify children by checksum
-               → reconstruct directory tree (ZPL) → pick a state → extract with per-block verification
+How ZFS finds a file              What zfs-salvage does
+----------------------            ------------------------------------
+uberblock
+   |
+MOS (list of datasets)
+   |
+dataset
+   |
+objset block  <-- destroyed       1. scan the disk for the root of
+   |   (what this tool was           the file tree
+   X    built for)                2. prove it by its checksums
+   |
+dnode tree   <-- go on here       3. continue from the tree root
+   |
+file entries (names, dates)       4. rebuild the folder tree
+   |
+file data                         5. pick a state, extract,
+(each block has a checksum)          verify every block
 ```
+
+The break is not always at the objset block: `make-case` tells you where yours is (its "Diagnosis" line).
+The steps in detail:
 
 1. **Scan** (`tools/zscan`, C): reads the device sequentially (~160–190 MB/s) and classifies
    every 512-byte position as objset block, indirect block of a dnode tree, or dnode block
@@ -93,22 +114,34 @@ the web UI opens in its browser.
 2. **Open the pool's devices read-only.** Plain partitions: `sudo blockdev --setro /dev/sdX3`.
    LUKS: `sudo cryptsetup open --readonly /dev/sdX4 ro_sdX4` (the tool never asks for passwords).
    Mirrors and stripes: do this for every disk of the pool. Check with `sudo zdb -l /dev/sdX3`
-   (it should print a label with the pool's name).
+   (it should print a label with the pool's name). Image files instead of devices: `chmod a-w disk.img` instead of
+   `blockdev --setro`, check with `zdb -l disk.img`.
 3. **Attach and mount the disk that will hold the rescued files** (a click in the file manager is
    enough). It must be a real disk, not the live system itself: that lives in RAM and is gone after a reboot.
 4. **Download the release bundle onto that disk** and unpack it there:
    `tar xzf zfs-salvage-*.tar.gz && cd zfs-salvage-*`
 5. **Check the machine:** `sudo ./zfs-salvage doctor`. Fix every `FAIL` ([Troubleshooting](#troubleshooting)).
    `zdb` comes with the live image; if it is missing: `sudo apt install zfsutils-linux`.
+   Warnings about missing devices and a missing case file are normal at this point; run `doctor` again after step 6.
 6. **Describe the pool:** `sudo ./zfs-salvage make-case --dev /dev/sdX3` (one `--dev` per disk).
    It reads the labels, tells you what the pool uses and whether that is supported, and writes the case file.
-   You can leave "names you expect in the root directory" empty.
+   Press Enter to accept the proposed answers; you can leave "names you expect in the root directory" empty.
+   It ends with a **Diagnosis** line that says where the way to your files is broken. Which one you get depends on your pool:
+   the dataset is listed but its object set block cannot be read (`UNREADABLE …`: the damage this tool works around, carry on);
+   the dataset is not in the list at all (destroyed, or a wrong name: its old trees may still be on the disk); the pool's own
+   metadata cannot be read (the scan still looks for file system trees); or the dataset opens normally (then you are here for files
+   that were deleted later: use an older state in the web UI). If several datasets are unreadable it asks which one you want
+   (with `--yes` you must say `--target <name>`).
 7. **Scan the disks.** Open two more terminal windows in the same folder. In the first run
    `sudo ./zfs-salvage scan /dev/sdX3`, in the second `sudo ./zfs-salvage rank --loop`. For a stripe
    scan one disk of every top-level vdev, for a mirror any one disk. A scan reads at about 150–190 MB/s (a 1 TB
-   disk takes about 1½ hours); stop it with Ctrl+C and start the same command again to resume.
+   disk takes about 1½ hours); stop it with Ctrl+C and start the same command again to resume. The scan ends with
+   `ALL CHUNKS: n/n`. Start `rank --loop` once the scan has written its first chunk: it stops by itself with "nothing pending - done"
+   when there is nothing to check (and no scan running), so run it again after the scan ends. "states 0" in its output at first is normal.
 8. **Open the web UI:** `sudo ./zfs-salvage` (it runs the checks again, then opens http://localhost:8765 in your browser; the link it
    prints ends in `?t=…`, a secret for this session: the server answers nobody else, so use that link if the browser does not open).
+   If two or more file systems are offered, choose the one whose folder names you recognise; a group with only one tree and an
+   old TXG is often just the pool's own root file system (its folders are the mount points of the others).
 
 Then follow the three steps in the UI:
 

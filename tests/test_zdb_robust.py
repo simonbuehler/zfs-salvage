@@ -78,6 +78,8 @@ class FlakyZdb(unittest.TestCase):
         self.assertEqual(case['pool']['name'], 'fx-modern-single')              # from the label
         self.assertTrue(case['timeline'], 'uberblock timeline from zdb -luuuu')
         self.assertEqual(case['datasets'], [])
+        self.assertEqual(case['diagnosis']['situation'], 'mos')
+        self.assertIn('Diagnosis:', r.stdout)
         self.assertIn('profile.meta_dnode_levels', ' '.join(validate(case)).replace('missing: ', ''))
 
 

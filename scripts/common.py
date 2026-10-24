@@ -8,7 +8,6 @@ machine itself (the default if there is no case yet or all its devices exist her
 import glob
 import json
 import os
-import re
 import shlex
 import subprocess
 import time
@@ -174,20 +173,9 @@ def ssh(cmd, timeout=20, **kw):
 
 
 def classify(root_names):
-    """Which dataset a verified tree belongs to, judged by the names in its root directory.
-
-    The target is recognised by the case's root_names (optional: without them nothing is the target and the
-    user picks one of the found groups, see rank-trees.tree_groups); the rest are generic hints for
-    typical Linux datasets, used only for the statistics on the status page.
-    """
-    s = set(root_names or [])
-    if s & set(TARGET.get('root_names', [])):
+    """Which dataset a verified tree belongs to: the target if its root directory has one of the case's root_names
+    (optional: without them nothing is the target and the user picks one of the found groups, see
+    rank-trees.tree_groups), else 'other'."""
+    if set(root_names or []) & set(TARGET.get('root_names', [])):
         return TARGET_NAME
-    rules = [('root fs', {'bin', 'etc', 'sbin'}), ('var', {'cache', 'lib', 'log', 'spool'}),
-             ('portage', {'profiles', 'metadata', 'eclass'}), ('usr', {'bin', 'lib', 'share', 'include'})]
-    for name, keys in rules:
-        if len(s & keys) >= 2:
-            return name
-    if any(re.match(r'linux', n) for n in s):
-        return 'usr/src'
     return 'other'

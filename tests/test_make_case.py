@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import unittest
 
 import fx  # noqa: I001 - first: puts scripts/ on the path
@@ -105,6 +106,39 @@ class CheckCompat(unittest.TestCase):
         problems, warnings = compat(['legacy-single-d0'], datasets=[{'name': 't/home', 'readable': False}])
         self.assertEqual(problems, [])
         self.assertEqual(kinds(warnings), ['target'])
+
+
+class Diagnosis(unittest.TestCase):
+    """make-case says where the way to the target's files is broken, from what it read (and the status page draws that)."""
+    UBS = [(10, 1), (12, 2)]
+
+    def test_the_four_situations(self):
+        ok = {'name': 'p/h', 'readable': True, 'objset_birth': 9}
+        bad = {'name': 'p/h', 'readable': False, 'error': 'no valid copy'}
+        cases = [('intact', mc.diagnose(self.UBS, 12, [ok], 'p/h')),
+                 ('objset', mc.diagnose(self.UBS, 12, [bad], 'p/h')),
+                 ('missing', mc.diagnose(self.UBS, 12, [ok], 'p/gone')),
+                 ('mos', mc.diagnose(self.UBS, None, [], 'p/h'))]
+        for want, d in cases:
+            self.assertEqual(d['situation'], want)
+            self.assertTrue(d['text'])
+        self.assertEqual(cases[1][1]['objset_error'], 'no valid copy')
+        self.assertEqual((cases[0][1]['uberblock_txg'], cases[0][1]['mos_txg'], cases[3][1]['mos_txg']), (12, 12, None))
+        self.assertIn('older state', cases[0][1]['text'])
+        self.assertIn('destroyed', cases[2][1]['text'])
+
+
+class Questions(unittest.TestCase):
+    def test_no_terminal_takes_the_proposed_answer(self):
+        """Found by the new-user README walkthrough: make-case crashed with EOFError when started without a terminal."""
+        import io
+        old = sys.stdin
+        sys.stdin = io.StringIO('')
+        try:
+            self.assertEqual(mc.ask('Dataset', 'p/home', False), 'p/home')
+        finally:
+            sys.stdin = old
+        self.assertEqual(mc.ask('Dataset', 'p/home', True), 'p/home')
 
 
 class BlockPointerText(unittest.TestCase):
@@ -231,6 +265,57 @@ class MakeCaseInContainer(unittest.TestCase):
                 self.assertEqual(case['pool']['name'], f'fx-{variant}')
                 self.assertEqual(case['profile']['meta_dnode_levels'], 6)
                 self.assertEqual(len(case['pool']['vdevs']), len(case['pool']['devices']) if variant == 'modern-stripe' else 1)
+
+    def test_diagnosis_is_written_and_matches_the_pool(self):
+        """undamaged → intact; destroyed objset block → objset; a destroyed dataset → missing (the name is typed in)."""
+        for variant, devs, target, want in (('modern-single', ['d0.img'], None, 'intact'),
+                                            ('modern-destroyed', ['d0.img'], 'fx-modern-destroyed/home', 'missing')):
+            with self.subTest(variant):
+                rc, out, path = self.run_make_case(variant, devs, *(['--target', target] if target else []))
+                self.assertEqual(rc, 0, out[-600:])
+                self.assertIn('Diagnosis:', out)
+                with open(path) as f:
+                    case = json.load(f)
+                self.assertEqual(case['diagnosis']['situation'], want)
+
+    def test_damaged_pool_is_diagnosed_as_a_broken_objset_block(self):
+        if not fx.have_images('modern-single'):
+            self.skipTest('no modern-single images')
+        dest = os.path.join(self.dir, 'img', 'modern-single-damaged')
+        fx.unpack('modern-single', dest)
+        fx.damage(dest, 'modern-single')
+        r = subprocess.run(['docker', 'run', '--rm', '-v', f'{os.path.join(self.dir, "img")}:/img:ro', '-v', f'{self.out}:/out',
+                            '-v', f'{fx.SCRIPTS}:/s:ro', IMAGE, 'python3', '/s/make-case.py', '--yes', '--name', 'diag-objset',
+                            '--out', '/out', '--dev', '/img/modern-single-damaged/d0.img'], capture_output=True, text=True, timeout=600)
+        self.assertEqual(r.returncode, 0, r.stdout[-600:])
+        with open(os.path.join(self.out, 'diag-objset.json')) as f:
+            case = json.load(f)
+        self.assertEqual(case['diagnosis']['situation'], 'objset')
+        self.assertEqual(case['target']['dataset'], 'fx-modern-single/home', 'the only unreadable dataset is proposed')
+        self.assertIn('objset block cannot be read', r.stdout)
+
+    def test_several_unreadable_datasets_are_not_guessed(self):
+        """Needs two broken datasets: fake the dataset list instead of building such a pool."""
+        import io
+        import contextlib
+        datasets = [{'name': 'p/a', 'readable': False, 'error': 'x'}, {'name': 'p/b', 'readable': False, 'error': 'x'},
+                    {'name': 'p', 'readable': True, 'type': 'ZPL', 'meta_dnode': {'nlevels': 6, 'indirect_block_size': 131072, 'dnode_block_size': 16384}}]
+        labels = {'device': '/dev/x', 'pool': 'p', 'pool_guid': 1, 'txg': 5, 'guid': 2, 'top_guid': 3, 'ashift': 12, 'version': 5000,
+                  'vdev_children': 1, 'top_type': 'disk', 'top_id': 0, 'children': 0, 'vdev_types': ['disk'], 'children_paths': [],
+                  'features_for_read': []}
+        saved = (mc.read_label, mc.read_uberblocks, mc.zsread_datasets, sys.argv)
+        mc.read_label = lambda zdb, d: dict(labels, device=d)
+        mc.read_uberblocks = lambda zdb, devs: ([(5, 1)], {5: 'DVA[0]=<0:1:1000>'})
+        mc.zsread_datasets = lambda *a, **k: {'rootbp_index': 0, 'datasets': datasets, 'features_for_write': {}, 'errors': []}
+        out = io.StringIO()
+        try:
+            sys.argv = ['make-case', '--dev', '/dev/null', '--yes', '--out', '/nonexistent']
+            with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as cm:
+                mc.main()
+        finally:
+            mc.read_label, mc.read_uberblocks, mc.zsread_datasets, sys.argv = saved
+        self.assertIn('--target', str(cm.exception.code))
+        self.assertIn('2 datasets cannot be read', out.getvalue())
 
     def test_refusals(self):
         """Each unsupported fixture: exit code 2, no case file, the reason in plain words and the alternative."""

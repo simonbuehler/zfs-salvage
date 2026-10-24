@@ -94,7 +94,11 @@ def sh(cmd, timeout=None, env=None):
 def ask(prompt, default, assume_yes):
     if assume_yes:
         return default
-    v = input(f'{prompt} [{default}]: ').strip()
+    try:
+        v = input(f'{prompt} [{default}]: ').strip()
+    except EOFError:                          # no terminal (started from a script): take the proposed answer
+        print()
+        return default
     return v or default
 
 
@@ -189,6 +193,34 @@ def zsread_datasets(labels, pool, rootbps, timeout, large_dnodes=()):
                 pass
     PROBLEMS.append(f'zsread datasets gave no answer: {out.strip()[-200:] or "no output"}')
     return None
+
+
+# ------------------------------------------------------------------ diagnosis
+def diagnose(ubs, txg, datasets, target):
+    """Where the way from the uberblock to the target's files is broken, judged by what was actually read:
+    situation 'mos' (the pool's metadata cannot be read), 'missing' (the target is not in the pool's list: destroyed, or
+    a wrong name), 'objset' (listed, but its objset block cannot be read) or 'intact' (it opens normally)."""
+    tgt = next((d for d in datasets if d['name'] == target), None)
+    d = {'uberblock_txg': ubs[-1][0] if ubs else None, 'mos_txg': txg, 'dataset_listed': tgt is not None,
+         'objset_readable': bool(tgt and tgt.get('readable')), 'objset_birth': (tgt or {}).get('objset_birth'),
+         'objset_error': (tgt or {}).get('error')}
+    if txg is None:
+        d['situation'] = 'mos'
+        d['text'] = ("The pool's own metadata (MOS) cannot be read at any uberblock, so not even the list of datasets is available. "
+                     'The scan can still find file system trees directly on the disk.')
+    elif tgt is None:
+        d['situation'] = 'missing'
+        d['text'] = (f"{target} is not in the pool's list of datasets: it was destroyed, or the name is wrong. If it was destroyed, "
+                     'its old trees may still be on the disk; the scan finds them.')
+    elif not tgt.get('readable'):
+        d['situation'] = 'objset'
+        d['text'] = (f'{target} is listed, but its objset block cannot be read ({tgt.get("error", "no valid copy")}). That is the damage '
+                     'this tool works around: the scan finds the file tree directly on the disk.')
+    else:
+        d['situation'] = 'intact'
+        d['text'] = (f'{target} opens normally: nothing is broken on the way to its files. Use this tool for files that were deleted '
+                     'later (an older state), or just use ZFS itself.')
+    return d
 
 
 # ------------------------------------------------------------------ main
@@ -339,8 +371,17 @@ def main():
     print(f'   {prof}')
 
     print('== 6. target dataset')
+    if not a.target and len(unreadable) > 1:                      # several candidates: do not guess
+        print(f'   {len(unreadable)} datasets cannot be read:')
+        for d in unreadable:
+            print(f"     {d['name']}")
+        if a.yes:
+            sys.exit('Several datasets cannot be read: say which one to recover with --target <name>.')
+        print('   Type the one you want to recover.')
     default_target = a.target or (unreadable[0]['name'] if unreadable else (readable[0]['name'] if readable else pool))
     target = ask('Dataset to recover', default_target, a.yes)
+    diagnosis = diagnose(ubs, txg, datasets, target)
+    print(f"   Diagnosis: {diagnosis['text']}")
     tgt = next((d for d in datasets if d['name'] == target and d.get('readable')), None)
     if tgt:                                          # only the target is checked for large dnodes (reads its whole meta-dnode)
         again = zsread_datasets(labels, pool, newest[found['rootbp_index']:][:1], a.zdb_budget, large_dnodes=[target])
@@ -375,7 +416,7 @@ def main():
                  'vdevs': vdev_groups(labels)},
         'profile': prof,
         'timeline': [{'txg': t, 'time': ts} for t, ts in ubs],
-        'open_txg': txg, 'datasets': datasets,
+        'open_txg': txg, 'datasets': datasets, 'diagnosis': diagnosis,
         'target': {'dataset': target, 'root_names': [x for x in names.split(',') if x],
                    'type': 'zvol' if any(d['name'] == target and d.get('type') == 'ZVOL' for d in datasets) else 'zpl'},
         'compatibility': [{'what': k, 'value': v, 'text': t, 'hint': h, 'blocking': (k, v, t, h) in problems}
