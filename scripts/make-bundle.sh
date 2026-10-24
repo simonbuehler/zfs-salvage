@@ -10,6 +10,7 @@ cd "$REPO"
 for f in tools/zscan/zscan tools/libzsalvage/libzsalvage.so; do
     [ -f "$f" ] || { echo "missing $f – run ${f%/*}/build.sh first"; exit 1; }
 done
+tools/check-portable.sh || { echo "the binaries are not portable – run tools/build-portable.sh"; exit 1; }
 VERSION="$(git describe --tags --always --dirty 2>/dev/null || date +%Y%m%d)"
 NAME="zfs-salvage-$VERSION"
 STAGE="$(mktemp -d)"
@@ -18,6 +19,7 @@ mkdir -p "$STAGE/$NAME"
 
 FILES=(zfs-salvage README.md AGENTS.md docs/design.md cases/example.json
        scripts/*.py scripts/*.sh scripts/ui scripts/diag
+       tools/build-portable.sh tools/check-portable.sh
        tools/zscan/zscan.c tools/zscan/build.sh tools/zscan/zscan
        tools/libzsalvage/zsalvage.c tools/libzsalvage/build.sh tools/libzsalvage/libzsalvage.so)
 [ -f LICENSE ] && FILES+=(LICENSE)

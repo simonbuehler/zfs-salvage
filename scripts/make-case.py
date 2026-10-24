@@ -82,6 +82,13 @@ def ask(prompt, default, assume_yes):
 
 
 # ------------------------------------------------------------------ discovery
+def read_only_flag(dev):
+    """'1' if the device is read-only: the kernel flag of a block device, the write bit of an image file."""
+    if os.path.isfile(dev):
+        return '0' if os.stat(dev).st_mode & 0o200 else '1'
+    return sh(['blockdev', '--getro', dev]).strip()
+
+
 def find_devices():
     out = sh(['lsblk', '-pnro', 'NAME,TYPE,FSTYPE,SIZE,RO'])
     devs = []
@@ -338,7 +345,7 @@ def main():
         sys.exit('No ZFS member devices found. Pass --dev (e.g. an opened LUKS mapper). '
                  'Open encrypted devices READ-ONLY: cryptsetup open --readonly ...')
     for d in devs:
-        ro = sh(['blockdev', '--getro', d]).strip()
+        ro = read_only_flag(d)
         print(f'   {d}  read-only={ro}' + ('' if ro == '1' else '   <-- WARNING: not read-only (blockdev --setro / overlay recommended)'))
 
     print('== 2. labels')
@@ -393,7 +400,7 @@ def main():
         tgt['large_dnodes'] = has_large_dnodes(a.zdb, devdir, pool, txg, target)
     feats = pool_features(a.zdb, devdir, pool, txg) if txg else {}
     lab['active_features'] = feats
-    names = ask('Names you expect in its root directory (comma separated, helps recognising it)',
+    names = ask('Names you expect in its root directory (comma separated; optional, you can also pick the file system later from the ones found)',
                 a.root_names, a.yes)
     name = a.name or ask('Case name', f'{pool}-{time.strftime("%Y%m%d")}', a.yes)
 

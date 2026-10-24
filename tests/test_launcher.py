@@ -59,6 +59,47 @@ class Launcher(unittest.TestCase):
         self.assertIn('included:     scripts/zsread.py', r.stdout)
         self.assertIn('data:         ' + tempfile.gettempdir() + '/zs-data-x', r.stdout)
 
+    def test_help_lists_the_commands_the_readme_uses(self):
+        out = run('help').stdout
+        for sub in ('doctor', 'web', 'make-case', 'scan', 'rank', 'version', 'bundle-info'):
+            self.assertIn(sub, out)
+
+    def test_scan_without_a_device_says_how_to_use_it(self):
+        r = run('scan', env={'ZFS_SALVAGE_STATE_DIR': tempfile.gettempdir() + '/zs-data-x'})
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('usage: scan-device.sh', r.stderr)
+
+    @unittest.skipUnless(fx.have_images('modern-single') and fx.ensure_built(), 'needs gcc and the modern-single images')
+    def test_scan_logs_where_the_status_page_looks(self):
+        """The case file names the scan log logs/scan_<device>.log (make-case) – the launcher must write exactly there."""
+        state, work = tempfile.mkdtemp(), fx.tmpdir()
+        try:
+            dev = fx.unpack('modern-single', work)[0]
+            os.chmod(dev, 0o444)
+            r = run('scan', dev, '64', env={'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local'})
+            self.assertEqual(r.returncode, 0, r.stdout[-300:] + r.stderr[-300:])
+            self.assertIn('ALL CHUNKS: 1/1', r.stdout)
+            log = os.path.join(state, 'logs', 'scan_' + os.path.basename(dev) + '.log')
+            with open(log) as f:
+                self.assertIn('ALL CHUNKS: 1/1', f.read())
+            self.assertTrue(os.path.isdir(os.path.join(state, 'logs', 'raw', 'scan_' + os.path.basename(dev))))
+        finally:
+            fx.rmtree(state)
+            fx.rmtree(work)
+
+    def test_rank_and_make_case_use_the_data_directory(self):
+        state = tempfile.mkdtemp()
+        try:
+            r = run('rank', env={'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local'})
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue(os.path.exists(os.path.join(state, 'status', 'target_candidates.json')))
+            r = run('make-case', '--help', env={'ZFS_SALVAGE_STATE_DIR': state})
+            self.assertEqual(r.returncode, 0)
+            self.assertIn('--dev', r.stdout)
+            self.assertTrue(os.path.isdir(os.path.join(state, 'cases')))
+        finally:
+            fx.rmtree(state)
+
     def test_doctor_runs_through_the_launcher(self):
         state = tempfile.mkdtemp()
         try:

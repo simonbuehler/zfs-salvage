@@ -23,8 +23,8 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (CANDIDATES, PROBE_STATS, PROBED, RAW, RAWS, TARGET, TARGET_NAME, TREE_PROFILE,
-                    classify, newest_txg, profile, reader_cmd, remote_argv, ssh, ssh_error)
+from common import (CANDIDATES, PROBE_STATS, PROBED, RAW, RAWS, TARGET, TARGET_NAME, TREE_GROUPS, TREE_PROFILE,
+                    classify, newest_txg, profile, reload_case, reader_cmd, remote_argv, ssh, ssh_error)
 
 LABEL = profile().get('label_start', 0x400000)
 
@@ -98,7 +98,41 @@ def min_birth_during_scan():
     return newest - newest // 5 if newest else 0
 
 
+SAME_FS = 0.5           # two trees whose top-level names overlap at least this much (Jaccard) are one file system
+MAX_GROUP_NAMES = 100
+
+
+def tree_groups(probed, root_names=()):
+    """The different file systems among the verified trees, newest first.
+
+    Trees are grouped by the set of names in their root directory, tolerant to small changes (files come and
+    go between states). `names` are the names that only this group has: what the user's choice stores as the
+    case's target.root_names. Zvols have no names and are not listed (the target is chosen from the dataset
+    list for those)."""
+    trees = sorted((r for r in probed.values() if r.get('ok') and r.get('type') != 'zvol' and r.get('root')),
+                   key=lambda r: -r['birth'])
+    groups = []
+    for r in trees:
+        names = set(r['root'])
+        g = next((g for g in groups if len(names & g['rep']) / len(names | g['rep']) >= SAME_FS), None)
+        if g is None:
+            g = {'rep': names, 'all': set(), 'newest_txg': r['birth'], 'objects': r.get('objects'), 'trees': 0}
+            groups.append(g)
+        g['all'] |= names
+        g['oldest_txg'] = r['birth']
+        g['trees'] += 1
+    out = []
+    for g in groups:
+        others = set().union(*(o['all'] for o in groups if o is not g))
+        own = sorted(g['all'] - others) or sorted(g['all'])
+        out.append({'names': own[:MAX_GROUP_NAMES], 'top': sorted(g['rep'])[:12], 'newest_txg': g['newest_txg'],
+                    'oldest_txg': g['oldest_txg'], 'objects': g['objects'], 'trees': g['trees'],
+                    'chosen': bool(set(own) & set(root_names))})
+    return out
+
+
 def run(limit):
+    reload_case()                                                 # the target may have been chosen in the UI meanwhile
     os.makedirs(os.path.dirname(PROBED), exist_ok=True)          # a fresh installation has no status directory yet
     probed = {}
     if os.path.exists(PROBED):
@@ -179,7 +213,11 @@ def run(limit):
         os.makedirs(os.path.dirname(TREE_PROFILE), exist_ok=True)
         with open(TREE_PROFILE, 'w') as f:
             json.dump(measured, f)
+    groups = tree_groups(probed, TARGET.get('root_names', []))
     os.makedirs(os.path.dirname(CANDIDATES), exist_ok=True)
+    with open(TREE_GROUPS + '.tmp', 'w') as f:
+        json.dump({'groups': groups, 'needs_choice': bool(groups) and not TARGET.get('root_names')}, f, ensure_ascii=False)
+    os.replace(TREE_GROUPS + '.tmp', TREE_GROUPS)
     json.dump(table, open(CANDIDATES + '.tmp', 'w'), ensure_ascii=False)
     os.replace(CANDIDATES + '.tmp', CANDIDATES)
     pending = max(len(todo) - len(batch), 0)

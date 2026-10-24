@@ -2,6 +2,9 @@
 # zfs-salvage launcher.   sudo ./zfs-salvage          check this machine, start the web UI, open the browser
 #                         ./zfs-salvage doctor        only the checks (also: --json, --no-root)
 #                         ./zfs-salvage web           only the web UI (no checks, no browser)
+#                         ./zfs-salvage make-case --dev <device>...   describe the pool, writes the case file
+#                         ./zfs-salvage scan <device> [chunk_gib]     scan a device (resumable)
+#                         ./zfs-salvage rank [--loop]                 verify the scan's finds
 #                         ./zfs-salvage version | bundle-info
 # All results (scan chunks, catalog, status, case files) go to ./data next to this script.
 set -uo pipefail
@@ -26,6 +29,15 @@ case "${1:-start}" in
         done
         ;;
     doctor) shift; mkdir -p "$ZFS_SALVAGE_STATE_DIR"; exec python3 -I "$ROOT/scripts/doctor.py" "$@" ;;
+    make-case) shift; mkdir -p "$ZFS_SALVAGE_CASES_DIR"; exec python3 -I "$ROOT/scripts/make-case.py" "$@" ;;
+    scan)      # progress goes to the terminal and to the log the status page reads (where the case file says: logs/scan_<device>.log)
+        shift
+        [ -n "${1:-}" ] || exec bash "$ROOT/scripts/scan-device.sh"
+        mkdir -p "$ZFS_SALVAGE_STATE_DIR/logs"
+        bash "$ROOT/scripts/scan-device.sh" "$@" 2>&1 | tee -a "$ZFS_SALVAGE_STATE_DIR/logs/scan_$(basename "$1").log"
+        exit "${PIPESTATUS[0]}" ;;
+    rank) shift; mkdir -p "$ZFS_SALVAGE_STATE_DIR/logs"; python3 -I "$ROOT/scripts/rank-trees.py" "$@" 2>&1 | tee -a "$ZFS_SALVAGE_STATE_DIR/logs/rank-trees.log"
+        exit "${PIPESTATUS[0]}" ;;
     web) mkdir -p "$ZFS_SALVAGE_CATALOG_DIR" "$ZFS_SALVAGE_CASES_DIR"; exec python3 -I "$ROOT/scripts/web.py" ;;
     start)
         if [ "$(id -u)" != 0 ]; then
@@ -44,6 +56,6 @@ case "${1:-start}" in
         echo "zfs-salvage $(version): $URL   (Ctrl+C to stop)"
         exec python3 -I "$ROOT/scripts/web.py"
         ;;
-    -h|--help|help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
+    -h|--help|help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//' ;;
     *) echo "unknown command: $1 (try --help)"; exit 2 ;;
 esac

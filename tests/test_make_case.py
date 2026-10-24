@@ -126,6 +126,18 @@ class DatasetParsing(unittest.TestCase):
 
 
 class ValidateCase(unittest.TestCase):
+    def test_image_files_are_read_only_by_their_write_bit(self):
+        """Found by walking through the README with an image file: blockdev --getro fails on files."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'disk0.img')
+            with open(path, 'wb') as f:
+                f.write(b'x')
+            os.chmod(path, 0o644)
+            self.assertEqual(mc.read_only_flag(path), '0')
+            os.chmod(path, 0o444)
+            self.assertEqual(mc.read_only_flag(path), '1')
+
     def test_repository_cases_are_valid(self):
         for f in ('example.json', 'rpool-2014.json'):
             path = os.path.join(fx.REPO, 'cases', f)

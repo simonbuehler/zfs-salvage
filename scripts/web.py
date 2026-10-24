@@ -22,7 +22,9 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import status_page  # noqa: E402
 import transfer  # noqa: E402
-from common import CANDIDATES, CATALOG, DB, HOST, LOCAL, LOGS, REPO, STATUS, WORKFLOW, reader_cmd, remote_argv  # noqa: E402
+import common  # noqa: E402
+from common import (CANDIDATES, CATALOG, DB, HOST, LOCAL, LOGS, REPO, STATUS, TREE_GROUPS, WORKFLOW,  # noqa: E402
+                    reader_cmd, remote_argv)
 
 RULES = f'{CATALOG}/selection_rules.jsonl'
 UI = f'{REPO}/scripts/ui/index.html'
@@ -256,6 +258,12 @@ class H(BaseHTTPRequestHandler):
             return self.send(transfer.places(q.get('type', 'local'), q.get('host', '')))
         if u.path == '/steps.js':
             return self.send(open(f'{REPO}/scripts/ui/steps.js', 'rb').read(), ctype='application/javascript')
+        if u.path == '/api/target/groups':
+            try:
+                with open(TREE_GROUPS) as f:
+                    return self.send(json.load(f))
+            except (OSError, ValueError):
+                return self.send({'groups': [], 'needs_choice': False})
         if u.path == '/api/workflow':
             return self.send(workflow())
         if u.path == '/api/catalog/status':
@@ -289,6 +297,8 @@ class H(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if self.path == '/api/catalog/rebuild':
             return self.send(rebuild_catalog(body.get('candidate')))
+        if self.path == '/api/target/choose':
+            return self.send(*choose_target(body))
         if self.path == '/api/transfer/check':
             return self.send(transfer.check(body))
         if self.path == '/api/transfer/start':
@@ -309,6 +319,21 @@ class H(BaseHTTPRequestHandler):
             apply(c, body)
             return self.send(summary(c))
         self.send({'error': 'unknown'}, 404)
+
+
+def choose_target(body):
+    """The user clicked "this one" on a group of trees (tree_groups.json): remember its names in the case and
+    refresh the candidate list in the background."""
+    names = body.get('names')
+    if not (isinstance(names, list) and names and all(isinstance(n, str) and n for n in names)):
+        return {'error': 'names must be a non-empty list'}, 400
+    try:
+        common.set_root_names(names[:100])
+    except (ValueError, OSError) as e:
+        return {'error': str(e)}, 400
+    subprocess.Popen([sys.executable, '-I', f'{REPO}/scripts/rank-trees.py', '0'], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL)
+    return {'ok': True, 'names': names[:100]}, 200
 
 
 def status_loop():

@@ -3,7 +3,7 @@
 Everything pool-specific comes from the case file (cases/<name>.json, written by make-case.py;
 pick one with ZFS_SALVAGE_CASE=<path> if there are several). The machine that has the pool's devices
 is the "recovery host": ZFS_SALVAGE_HOST=<ssh alias or user@host>, or `local` when the tool runs on that
-machine itself (the default if all devices of the case exist here, else `recovery-host`).
+machine itself (the default if there is no case yet or all its devices exist here, else `recovery-host`).
 """
 import glob
 import json
@@ -24,6 +24,7 @@ PROBED = f'{STATUS}/probed.jsonl'
 PROBE_STATS = f'{STATUS}/probe_stats.json'
 WORKFLOW = f'{STATUS}/workflow.json'
 TREE_PROFILE = f'{STATUS}/tree_profile.json'     # facts measured on a verified tree (rank-trees.py)
+TREE_GROUPS = f'{STATUS}/tree_groups.json'       # the different file systems found among the verified trees
 CATALOG = os.environ.get('ZFS_SALVAGE_CATALOG_DIR') or f'{REPO}/catalog'     # catalog, selection, transfers
 DB = f'{CATALOG}/catalog.sqlite'
 CASES = os.environ.get('ZFS_SALVAGE_CASES_DIR') or f'{REPO}/cases'          # case files (make-case.py writes here)
@@ -34,10 +35,17 @@ def _under_state(p):
     return p if os.path.isabs(p) else f'{STATE}/{p}'
 
 
-def load_case():
-    path = os.environ.get('ZFS_SALVAGE_CASE') or next(
+def case_path():
+    return os.environ.get('ZFS_SALVAGE_CASE') or next(
         (p for p in sorted(glob.glob(f'{CASES}/*.json')) if not p.endswith('example.json')), None)
-    return json.load(open(path)) if path else {}
+
+
+def load_case():
+    path = case_path()
+    if not path:
+        return {}
+    with open(path) as f:
+        return json.load(f)
 
 
 CASE = load_case()
@@ -47,7 +55,8 @@ def _default_host():
     if os.environ.get('ZFS_SALVAGE_HOST'):
         return os.environ['ZFS_SALVAGE_HOST']
     devs = [d.get('path', '').split('@')[0] for d in CASE.get('pool', {}).get('devices', [])]
-    return 'local' if devs and all(os.path.exists(d) for d in devs) else 'recovery-host'
+    # no case yet (fresh installation on the machine that has the disks): local; a case whose devices are not here: remote
+    return 'local' if all(os.path.exists(d) for d in devs) else 'recovery-host'
 
 
 HOST = _default_host()
@@ -65,6 +74,32 @@ def remote_argv(cmd, host=None, opts=()):
 
 TARGET = CASE.get('target', {})
 TARGET_NAME = TARGET.get('dataset', 'target')
+
+
+def reload_case():
+    """Read the case file again, in place: modules that imported CASE or TARGET see the change (a long-running
+    rank-trees loop and the web server pick up a target chosen in the UI this way)."""
+    new = load_case()
+    CASE.clear()
+    CASE.update(new)
+    TARGET.clear()
+    TARGET.update(CASE.get('target', {}))
+    if 'target' in CASE:
+        CASE['target'] = TARGET
+
+
+def set_root_names(names):
+    """Remember in the case file which top-level names identify the target file system."""
+    path = case_path()
+    if not path:
+        raise ValueError('no case file yet')
+    with open(path) as f:
+        case = json.load(f)
+    case.setdefault('target', {})['root_names'] = list(names)
+    with open(path + '.tmp', 'w') as f:
+        json.dump(case, f, indent=1, ensure_ascii=False)
+    os.replace(path + '.tmp', path)
+    reload_case()
 _scan = CASE.get('scan', {})
 SCAN_DEVICE = _scan.get('device', '')
 RAW = _under_state(_scan.get('chunk_dir') or 'logs/raw/scan_' + (SCAN_DEVICE or 'device'))
@@ -141,7 +176,8 @@ def ssh(cmd, timeout=20, **kw):
 def classify(root_names):
     """Which dataset a verified tree belongs to, judged by the names in its root directory.
 
-    The target is recognised by the case's root_names; the rest are generic hints for
+    The target is recognised by the case's root_names (optional: without them nothing is the target and the
+    user picks one of the found groups, see rank-trees.tree_groups); the rest are generic hints for
     typical Linux datasets, used only for the statistics on the status page.
     """
     s = set(root_names or [])

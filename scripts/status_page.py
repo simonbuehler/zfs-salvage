@@ -17,7 +17,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (CANDIDATES, CASE, DB, HOST, LOGS, PROBE_STATS, RAW, SCAN_DEVICE, SCAN_LOG, STATUS as OUT,
-                    TARGET, TARGET_NAME, WORKFLOW, profile, ssh, ssh_error)
+                    TARGET, TARGET_NAME, TREE_GROUPS, WORKFLOW, profile, ssh, ssh_error)
 
 SMART_CACHE = f'{OUT}/.smart.json'
 LOG = SCAN_LOG
@@ -189,6 +189,24 @@ def chain_state(cands, scanning):
 
 
 # ---------------------------------------------------------------- page
+def groups_card(groups, needs_choice):
+    """Which file system to recover: shown while the choice is open, and when more than one was found."""
+    if not groups or (len(groups) < 2 and not needs_choice):
+        return ''
+    rows = ''
+    for g in groups:
+        top = ', '.join(g['top']) + (' …' if len(g['top']) >= 12 else '')
+        rows += (f'<tr><td><b>{html.escape(top)}</b><br><span class="mut">{num(g["objects"] or 0)} objects in the newest state · '
+                 f'{g["trees"]} state(s), {txg_label(g["oldest_txg"])} – {txg_label(g["newest_txg"])}</span></td>'
+                 f'<td style="text-align:right">'
+                 + ('<span class="mut">✓ chosen</span>' if g['chosen'] else
+                    f'<button class="pri" data-names="{html.escape(json.dumps(g["names"]), quote=True)}" '
+                    f'onclick="choose(this)">This one</button>') + '</td></tr>')
+    title = ('Found %d different file systems – which one do you want to recover?' % len(groups) if needs_choice
+             else 'Found %d different file systems' % len(groups))
+    return f'<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>{title}</b><table style="width:100%">{rows}</table></div>'
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     log = open(LOG).read() if os.path.exists(LOG) else ''
@@ -234,6 +252,11 @@ def main():
     except Exception:
         pass
     byds = pstats.get('by_dataset', {})
+    try:
+        tg = json.load(open(TREE_GROUPS))
+    except Exception:
+        tg = {}
+    groups, needs_choice = tg.get('groups', []), tg.get('needs_choice', False)
     host_error = host_error or pstats.get('host_error')
     alerts = []                                       # (severity, text): problems the user must see
     if host_error:
@@ -267,7 +290,9 @@ def main():
         pass
     best = cands[0] if cands else {}
     note = '<span class="mut">your selection is kept</span>'
-    if not newest:
+    if not newest and needs_choice:
+        action = '<span class="mut">Found several file systems – tell which one to recover (below).</span>'
+    elif not newest:
         action = '<span class="mut">No verified state yet – candidates are checked as soon as chunks are done.</span>'
     elif cat_state is None:
         action = f'<button class="pri" onclick="rebuild()">Build catalog from this state</button>'
@@ -286,7 +311,7 @@ def main():
     scanning = cur_idx >= 0 or len(done) < n
     banner = ''.join(f'<div class="alert {sev}"><b>{"✗" if sev == "error" else "!"}</b> {html.escape(text)}</div>'
                      for sev, text in alerts)
-    hero = banner + hero
+    hero = banner + hero + groups_card(groups, needs_choice)
     json.dump({'alerts': [t for _, t in alerts], 'scan': {'running': cur_idx >= 0, 'pct': 100 * frac, 'eta': eta},
                'newest': {'txg': newest, 'label': txg_label(newest) if newest else None,
                           'date': txg_date(newest) if newest else None,
@@ -385,6 +410,7 @@ async function cj(){{try{{const j=await (await fetch('/api/catalog/status')).jso
  e.textContent=j.state==='running'?`⟳ building catalog from TXG ${{j.txg}} – ${{j.info}} …`:j.state==='failed'?`✗ failed: ${{j.info}}`:'';
  if(j.state==='running'){{document.querySelectorAll('#hero button').forEach(b=>b.disabled=true);poll=poll||setInterval(cj,3000)}}
  else if(poll){{clearInterval(poll);poll=null;if(j.state==='done')location.reload()}}}}catch(e){{}}}}
+async function choose(b){{b.disabled=true;await fetch('/api/target/choose',{{method:'POST',body:JSON.stringify({{names:JSON.parse(b.dataset.names)}})}});setTimeout(()=>location.reload(),2500)}}
 async function rebuild(){{await fetch('/api/catalog/rebuild',{{method:'POST',body:'{{}}'}});cj()}}
 cj();
 </script></body></html>'''
