@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 
 import fx  # noqa: I001 - first: puts scripts/ on the path
+from test_visible_errors import TOKEN, authed
 
 LAUNCHER = os.path.join(fx.REPO, 'zfs-salvage')
 
@@ -109,12 +110,40 @@ class Launcher(unittest.TestCase):
         finally:
             fx.rmtree(state)
 
+    def test_web_started_by_the_launcher_has_a_session_token_in_its_link(self):
+        state = tempfile.mkdtemp()
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+        e = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
+        e.update(ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_HOST='local', SALVAGE_UI_PORT=str(port))
+        p = subprocess.Popen([LAUNCHER, 'web'], env=e, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        try:
+            link = p.stderr.readline().strip()
+            self.assertIn(f'http://localhost:{port}/?t=', link)
+            token = link.split('?t=')[1].split()[0]
+            for _ in range(60):
+                try:
+                    req = urllib.request.Request(f'http://127.0.0.1:{port}/api/workflow', headers={'X-ZS-Token': token})
+                    self.assertIn('transfer', json.load(urllib.request.urlopen(req, timeout=3)))
+                    break
+                except OSError:
+                    time.sleep(0.3)
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                urllib.request.urlopen(f'http://127.0.0.1:{port}/api/workflow', timeout=3)
+            self.assertEqual(cm.exception.code, 403)
+        finally:
+            p.terminate()
+            p.wait(timeout=10)
+            p.stderr.close()
+            fx.rmtree(state)
+
     def test_web_keeps_everything_in_the_data_directory(self):
         state = tempfile.mkdtemp()
         with socket.socket() as s:
             s.bind(('127.0.0.1', 0))
             port = s.getsockname()[1]
-        e = dict(os.environ, ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_HOST='local', SALVAGE_UI_PORT=str(port))
+        e = dict(os.environ, ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_HOST='local', SALVAGE_UI_PORT=str(port), ZFS_SALVAGE_TOKEN=TOKEN)
         for k in ('ZFS_SALVAGE_CATALOG_DIR', 'ZFS_SALVAGE_CASES_DIR', 'ZFS_SALVAGE_CASE'):
             e.pop(k, None)
         p = subprocess.Popen([LAUNCHER, 'web'], env=e, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -122,7 +151,7 @@ class Launcher(unittest.TestCase):
             deadline, wf = time.time() + 30, None
             while time.time() < deadline and wf is None:
                 try:
-                    wf = json.load(urllib.request.urlopen(f'http://127.0.0.1:{port}/api/workflow', timeout=3))
+                    wf = json.load(urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/api/workflow'), timeout=3))
                 except OSError:
                     time.sleep(0.5)
             self.assertIsNotNone(wf, 'the web UI did not start')
@@ -134,9 +163,9 @@ class Launcher(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(state, 'status', 'index.html')), 'status page not in the data directory')
             # regression: generating the status page used to create an empty catalog file, which broke the API for good
             self.assertFalse(os.path.exists(os.path.join(state, 'catalog', 'catalog.sqlite')))
-            self.assertIn('alerts', json.load(urllib.request.urlopen(f'http://127.0.0.1:{port}/api/workflow', timeout=5)) | {'alerts': 0})
+            self.assertIn('alerts', json.load(urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/api/workflow'), timeout=5)) | {'alerts': 0})
             try:
-                urllib.request.urlopen(f'http://127.0.0.1:{port}/api/summary', timeout=5)
+                urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/api/summary'), timeout=5)
                 self.fail('/api/summary should say there is no catalog')
             except urllib.error.HTTPError as e:
                 self.assertEqual(e.code, 404)

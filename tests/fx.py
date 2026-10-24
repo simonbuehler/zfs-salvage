@@ -16,6 +16,8 @@ TESTS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(TESTS)
 FIXTURES = os.environ.get('ZFS_SALVAGE_FIXTURES') or os.path.join(TESTS, 'fixtures')
 SCRIPTS = os.path.join(REPO, 'scripts')
+# transfers to temporary directories must work where /tmp is a RAM disk; the target-safety tests switch this off
+os.environ.setdefault('ZFS_SALVAGE_ALLOW_RAM_TARGET', '1')
 ZSCAN = os.path.join(REPO, 'tools', 'zscan', 'zscan')
 LIB = os.path.join(REPO, 'tools', 'libzsalvage', 'libzsalvage.so')
 

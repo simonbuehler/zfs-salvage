@@ -16,7 +16,7 @@ import unittest
 import urllib.request
 
 import fx  # noqa: I001 - first: puts scripts/ on the path
-from test_visible_errors import env_for
+from test_visible_errors import TOKEN, env_for
 
 
 def free_port():
@@ -27,7 +27,7 @@ def free_port():
 
 def api(port, path, body=None):
     req = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=None if body is None else json.dumps(body).encode(),
-                                 method='GET' if body is None else 'POST')
+                                 method='GET' if body is None else 'POST', headers={'X-ZS-Token': TOKEN})
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.load(r)
 

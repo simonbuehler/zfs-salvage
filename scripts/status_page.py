@@ -207,6 +207,27 @@ def groups_card(groups, needs_choice):
     return f'<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>{title}</b><table style="width:100%">{rows}</table></div>'
 
 
+def states_card(cands, cat_state):
+    """All verified states of the chosen file system, newest first: the catalog can be built from any of them, e.g.
+    from before something was deleted. Empty when there is only one."""
+    usable = [c for c in cands if c.get('candidate')]
+    if len(usable) < 2:
+        return ''
+    rows = ''
+    for c in usable:
+        cand = dict(c['candidate'], txg=c['birth'])
+        action = ('<span class="mut">✓ in the catalog</span>' if cat_state == c['birth'] else
+                  f'<button data-cand="{html.escape(json.dumps(cand), quote=True)}" onclick="rebuildFrom(this)">Build catalog from this state</button>')
+        rows += (f'<tr><td>{html.escape(txg_date(c["birth"]))}</td><td>{num(c["birth"])}</td><td>{num(c.get("objects") or 0)}</td>'
+                 f'<td class="mut">{html.escape(str(c.get("root")))}</td><td>{action}</td></tr>')
+    return (f'<details class="card"><summary>{len(usable)} recoverable states – choose another one, e.g. from before something was deleted</summary>'
+            '<p class="mut">Every state is a complete, checksum-verified picture of the file system at that time. The longer the pool '
+            'was used after a deletion, the more of the old blocks have been overwritten: files from an older state can come out '
+            'incomplete, and the transfer lists every file that does.</p>'
+            f'<div class="wrap" style="max-height:340px;overflow-y:auto"><table><tr><th>Date</th><th>TXG</th><th>Objects</th>'
+            f'<th>Top level</th><th></th></tr>{rows}</table></div></details>')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     log = open(LOG).read() if os.path.exists(LOG) else ''
@@ -378,6 +399,7 @@ h3{{font-size:14px;margin:14px 0 6px}}
 <h1>zfs-salvage · {ds}</h1>
 <div class="mut" id="upd">Updated {now} · refreshes every 20 s · case {html.escape(CASE.get("name", "–"))}</div>
 <div class="card" id="hero">{hero}</div>
+<div id="states">{states_card(cands, cat_state)}</div>
 {crash_note}
 <div class="card" id="scan"><b>Scan</b> <span class="mut">– device {html.escape(SCAN_DEVICE)} ({size / 1e12:.2f} TB)</span>
 <div class="bar" style="margin:8px 0"><div style="width:{100 * frac:.1f}%"></div></div>
@@ -401,16 +423,17 @@ h3{{font-size:14px;margin:14px 0 6px}}
 // live refresh: swap the generated parts, keep open/closed state of <details>
 setInterval(async()=>{{try{{const d=new DOMParser().parseFromString(await (await fetch('/')).text(),'text/html');
  for(const id of ['upd','hero','det'])document.getElementById(id).innerHTML=d.getElementById(id).innerHTML;
- for(const id of ['scan','chain']){{const o=document.getElementById(id),open=[...o.querySelectorAll('details')].map(x=>x.open);
+ for(const id of ['scan','chain','states']){{const o=document.getElementById(id),open=[...o.querySelectorAll('details')].map(x=>x.open);
   o.innerHTML=d.getElementById(id).innerHTML;o.querySelectorAll('details').forEach((x,i)=>x.open=!!open[i])}}
  cj()}}catch(e){{}}}},20000);
 let poll;
 async function cj(){{try{{const j=await (await fetch('/api/catalog/status')).json(),e=document.getElementById('cj');
  if(!e||j.state==='idle')return;
  e.textContent=j.state==='running'?`⟳ building catalog from TXG ${{j.txg}} – ${{j.info}} …`:j.state==='failed'?`✗ failed: ${{j.info}}`:'';
- if(j.state==='running'){{document.querySelectorAll('#hero button').forEach(b=>b.disabled=true);poll=poll||setInterval(cj,3000)}}
+ if(j.state==='running'){{document.querySelectorAll('#hero button, #states button').forEach(b=>b.disabled=true);poll=poll||setInterval(cj,3000)}}
  else if(poll){{clearInterval(poll);poll=null;if(j.state==='done')location.reload()}}}}catch(e){{}}}}
 async function choose(b){{b.disabled=true;await fetch('/api/target/choose',{{method:'POST',body:JSON.stringify({{names:JSON.parse(b.dataset.names)}})}});setTimeout(()=>location.reload(),2500)}}
+async function rebuildFrom(b){{b.disabled=true;await fetch('/api/catalog/rebuild',{{method:'POST',body:JSON.stringify({{candidate:JSON.parse(b.dataset.cand)}})}});cj()}}
 async function rebuild(){{await fetch('/api/catalog/rebuild',{{method:'POST',body:'{{}}'}});cj()}}
 cj();
 </script></body></html>'''

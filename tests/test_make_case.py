@@ -70,7 +70,7 @@ class CheckCompat(unittest.TestCase):
         problems, _ = compat(['unsupported-special-d0'], datasets=[])
         self.assertEqual(kinds(problems), ['devices'])
         self.assertIn('[1] of 2', problems[0][2])
-        self.assertIn('special', problems[0][2])
+        self.assertIn('special', problems[0][3])
 
     def test_missing_vdev_with_known_allocation_classes(self):
         problems, _ = compat(['unsupported-special-d0'], datasets=[], features={'org.zfsonlinux:allocation_classes': 1})
@@ -107,22 +107,42 @@ class CheckCompat(unittest.TestCase):
         self.assertEqual(kinds(warnings), ['target'])
 
 
-class DatasetParsing(unittest.TestCase):
-    def test_zdb_2_2_lists_datasets_without_rootbp(self):
-        out = ('Dataset mos [META], ID 0, cr_txg 4, 300K, 54 objects\n'
-               'Dataset p/home [ZPL], ID 259, cr_txg 8, 5.71M, 74 objects\n'
-               "failed to hold dataset 'p/gone': Input/output error\n")
-        got = {d['name']: d for d in mc.parse_datasets(out)}
-        self.assertEqual(set(got), {'mos', 'p/home', 'p/gone'})
-        self.assertEqual((got['p/home']['objects'], got['p/home']['checksum'], got['p/home']['encrypted']), (74, None, False))
-        self.assertFalse(got['p/gone']['readable'])
+class BlockPointerText(unittest.TestCase):
+    """zsread.bp_from_text: the root block pointers come from `zdb -luuuu` as text."""
+    TEXT = ('DVA[0]=<0:3083000:1000> DVA[1]=<0:131e000:1000> [L0 DMU objset] fletcher4 uncompressed {} LE contiguous '
+            'unique double size=1000L/1000P birth=44L/45P fill=74 cksum=000000000000000a:b:c:d')
 
-    def test_rootbp_and_encryption(self):
-        line = ('Dataset p/h [ZPL], ID 1, cr_txg 8, 1M, 74 objects, rootbp DVA[0]=<0:1:1000> [L0 DMU objset] '
-                'fletcher4 lz4 {} LE contiguous unique double size=1000L/1000P birth=45L/45P fill=74 cksum=1:2:3:4\n')
-        for word, enc in (('unencrypted', False), ('authenticated', True), ('encrypted', True)):
-            d = mc.parse_datasets(line.format(word))[0]
-            self.assertEqual((d['checksum'], d['compression'], d['encrypted'], d['objset_birth']), ('fletcher4', 'lz4', enc, 45))
+    def bp(self, text):
+        import zsread
+        return zsread.BP(zsread.bp_from_text(text))
+
+    def test_fields(self):
+        bp = self.bp(self.TEXT.format('unencrypted'))
+        self.assertEqual(bp.dvas, [(0, 0x3083000, 0x1000), (0, 0x131e000, 0x1000)])
+        self.assertEqual((bp.lsize, bp.psize, bp.comp, bp.cksum_alg, bp.type, bp.level), (0x1000, 0x1000, 2, 7, 11, 0))
+        self.assertEqual((bp.birth, bp.fill, bp.cksum, bp.gang, bp.embedded), (44, 74, (10, 11, 12, 13), False, False))
+
+    def test_encryption_flag_and_compression_names(self):
+        self.assertFalse(self.bp(self.TEXT.format('unencrypted')).w[6] >> 61 & 1)
+        for word in ('authenticated', 'encrypted'):
+            self.assertTrue(self.bp(self.TEXT.format(word)).w[6] >> 61 & 1, word)
+        self.assertEqual(self.bp(self.TEXT.replace('uncompressed', 'lz4').format('unencrypted')).comp, 15)
+        self.assertEqual(self.bp(self.TEXT.replace('uncompressed', 'gzip-6').format('unencrypted')).comp, 10)
+
+    def test_second_vdev_and_gang(self):
+        bp = self.bp(self.TEXT.replace('DVA[1]=<0:131e000:1000>', 'DVA[1]=<1:2000:200G>').format('unencrypted'))
+        self.assertEqual(bp.dvas[1], (1, 0x2000, 0x200))
+        self.assertTrue(bp.gang)
+
+    def test_garbage_is_refused(self):
+        import zsread
+        for bad in ('', 'rootbp = nothing', self.TEXT.replace('fletcher4', 'rot13').format('unencrypted')):
+            with self.assertRaises(ValueError):
+                zsread.bp_from_text(bad)
+
+    def test_nicenum_like_zdb(self):
+        import zsread
+        self.assertEqual([zsread.nicenum(n) for n in (96 * 1024, 304 * 1024, 5965000, 300 * 1024)], ['96K', '304K', '5.69M', '300K'])
 
 
 class ValidateCase(unittest.TestCase):
@@ -213,15 +233,22 @@ class MakeCaseInContainer(unittest.TestCase):
                 self.assertEqual(len(case['pool']['vdevs']), len(case['pool']['devices']) if variant == 'modern-stripe' else 1)
 
     def test_refusals(self):
-        for variant, devs, needle in (
-                ('raidz1-4', ['d0.img', 'd1.img', 'd2.img', 'd3.img'], 'is raidz'),
-                ('unsupported-encrypted', ['d0.img'], 'natively encrypted'),
-                ('unsupported-special', ['d0.img'], '[1] of 2')):
-            with self.subTest(variant):
+        """Each unsupported fixture: exit code 2, no case file, the reason in plain words and the alternative."""
+        for variant, devs, needles in (
+                ('raidz1-4', ['d0.img', 'd1.img', 'd2.img', 'd3.img'],
+                 ['is raidz, which zfs-salvage cannot read yet', 'PhotoRec']),
+                ('raidz1-4', ['d0.img', 'd1.img', 'd2.img'],            # = raidz1-4-missing: one disk less
+                 ['is raidz, which zfs-salvage cannot read yet', 'has only 3 of 4 disks here', 'rebuilding a missing disk from parity']),
+                ('unsupported-encrypted', ['d0.img'],
+                 ['natively encrypted: its files cannot be read without the keys', 'zfs load-key']),
+                ('unsupported-special', ['d0.img'],
+                 ['top-level vdev(s) [1] of 2 have no device', '"special" vdev it held the metadata', 'PhotoRec'])):
+            with self.subTest(variant, devices=len(devs)):
                 rc, out, path = self.run_make_case(variant, devs)
                 self.assertEqual(rc, 2, out[-600:])
                 self.assertIn('NOT SUPPORTED', out)
-                self.assertIn(needle, out)
+                for needle in needles:
+                    self.assertIn(needle, out)
                 self.assertFalse(os.path.exists(path), 'no case file may be written')
 
     def test_large_dnodes_and_missing_mirror_member_warn_but_pass(self):

@@ -13,7 +13,10 @@ export ZFS_SALVAGE_STATE_DIR="${ZFS_SALVAGE_STATE_DIR:-$ROOT/data}"
 export ZFS_SALVAGE_CATALOG_DIR="${ZFS_SALVAGE_CATALOG_DIR:-$ZFS_SALVAGE_STATE_DIR/catalog}"
 export ZFS_SALVAGE_CASES_DIR="${ZFS_SALVAGE_CASES_DIR:-$ZFS_SALVAGE_STATE_DIR/cases}"
 PORT="${SALVAGE_UI_PORT:-8765}"
+# the web server talks only to whoever has this per-session token (the link below sets it as a cookie)
+export ZFS_SALVAGE_TOKEN="${ZFS_SALVAGE_TOKEN:-$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))' 2>/dev/null)}"
 URL="http://localhost:$PORT/"
+LINK="$URL?t=$ZFS_SALVAGE_TOKEN"
 
 version() { cat "$ROOT/VERSION" 2>/dev/null || git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || echo unknown; }
 
@@ -33,6 +36,14 @@ case "${1:-start}" in
     scan)      # progress goes to the terminal and to the log the status page reads (where the case file says: logs/scan_<device>.log)
         shift
         [ -n "${1:-}" ] || exec bash "$ROOT/scripts/scan-device.sh"
+        case "$1" in /*) dev="$1" ;; *) dev="/dev/mapper/$1" ;; esac
+        python3 -I "$ROOT/scripts/doctor.py" --smart "$dev"
+        if [ $? -eq 3 ]; then       # a failing disk is read only after the user has said so
+            if [ "${ZFS_SALVAGE_SCAN_ANYWAY:-}" != 1 ]; then
+                if [ -t 0 ]; then read -r -p "Scan it anyway? [y/N] " yn; [ "$yn" = y ] || [ "$yn" = Y ] || exit 1
+                else echo "Not scanning. To scan anyway: ZFS_SALVAGE_SCAN_ANYWAY=1 ./zfs-salvage scan $1"; exit 1; fi
+            fi
+        fi
         mkdir -p "$ZFS_SALVAGE_STATE_DIR/logs"
         bash "$ROOT/scripts/scan-device.sh" "$@" 2>&1 | tee -a "$ZFS_SALVAGE_STATE_DIR/logs/scan_$(basename "$1").log"
         exit "${PIPESTATUS[0]}" ;;
@@ -49,11 +60,11 @@ case "${1:-start}" in
         python3 -I "$ROOT/scripts/doctor.py" || { echo; echo "Not starting: fix the problems above and run again."; exit 1; }
         echo
         if [ -n "${SUDO_USER:-}" ]; then      # open the browser as the desktop user, not as root; best effort
-            ( for _ in $(seq 1 40); do curl -s -o /dev/null "$URL" 2>/dev/null && break; sleep 0.5; done
+            ( for _ in $(seq 1 40); do curl -s -o /dev/null -H "X-ZS-Token: $ZFS_SALVAGE_TOKEN" "$URL" 2>/dev/null && break; sleep 0.5; done
               sudo -u "$SUDO_USER" env DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
-                  xdg-open "$URL" >/dev/null 2>&1 || echo "open $URL in your browser" ) &
+                  xdg-open "$LINK" >/dev/null 2>&1 || echo "open $LINK in your browser" ) &
         fi
-        echo "zfs-salvage $(version): $URL   (Ctrl+C to stop)"
+        echo "zfs-salvage $(version): $LINK   (Ctrl+C to stop; other links to this server are refused)"
         exec python3 -I "$ROOT/scripts/web.py"
         ;;
     -h|--help|help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//' ;;

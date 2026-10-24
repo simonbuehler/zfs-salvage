@@ -1,0 +1,3 @@
+#!/bin/bash
+# A zpool that lists the pools in FAKE_POOLS (space separated), for `zpool list -H -o name`
+for p in ${FAKE_POOLS:-}; do echo "$p"; done

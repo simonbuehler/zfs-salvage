@@ -100,12 +100,15 @@ the web UI opens in its browser.
    `sudo ./zfs-salvage scan /dev/sdX3`, in the second `sudo ./zfs-salvage rank --loop`. For a stripe
    scan one disk of every top-level vdev, for a mirror any one disk. A scan reads at about 150–190 MB/s (a 1 TB
    disk takes about 1½ hours); stop it with Ctrl+C and start the same command again to resume.
-8. **Open the web UI:** `sudo ./zfs-salvage` (it runs the checks again, then opens http://localhost:8765).
+8. **Open the web UI:** `sudo ./zfs-salvage` (it runs the checks again, then opens http://localhost:8765 in your browser; the link it
+   prints ends in `?t=…`, a secret for this session: the server answers nobody else, so use that link if the browser does not open).
 
 Then follow the three steps in the UI:
 
 1. **Find a state:** scan progress, the file systems found (pick yours if there are several), the best
    recoverable state with its date and distance to the last change, and the button that builds or updates the catalog.
+   Every older state is listed too: to get back files you deleted later, or a destroyed file system, build the catalog from a
+   state from before that (the longer the pool was used afterwards, the more of the old blocks are overwritten).
 2. **Select files:** folder tree with tri-state checkboxes, quick filters (photos & videos,
    documents, everything without hidden folders), name, date and size filters, and a list of unreadable entries.
 3. **Transfer:** pick this computer, another computer (hosts from `~/.ssh/config`) or a disk of the
@@ -118,7 +121,8 @@ folder to start over; the pool's disks are never touched.
 ### Failing disks
 
 A disk that already shows read errors can die while you scan it, and every pass over it costs
-life. Copy it once with `ddrescue`, put the image on the target disk, make it read-only, and give the
+life. `./zfs-salvage doctor` reads the SMART values (`sudo apt install smartmontools`) and warns about reallocated, pending or
+uncorrectable sectors; `./zfs-salvage scan` then asks before it reads such a disk. Copy it once with `ddrescue`, put the image on the target disk, make it read-only, and give the
 image to the tool instead of the device:
 
 ```bash
@@ -148,7 +152,7 @@ reboot of a live system), and scan, ranking and the web UI run on the workstatio
 |---|---|---|
 | root | not running as root | Start with `sudo ./zfs-salvage` (reading the devices needs root). `--no-root` only looks around. |
 | python | python x is too old | Use a current live system; Ubuntu 24.04 has 3.12. |
-| zdb | zdb is not installed | `sudo apt install zfsutils-linux`. Only `zdb -l` is used; the pool is never imported. |
+| zdb | zdb is not installed | `sudo apt install zfsutils-linux`. Only the label calls (`zdb -l`, `zdb -luuuu`) are used; the pool is never imported. |
 | zdb | zdb found, but no ZFS member device to test it on | Attach the pool's disks (opened read-only) and run `doctor` again. |
 | zdb | `zdb -l …` shows no ZFS label | The device is not a pool member: use the partition (`/dev/sdX3`) or the opened LUKS mapper, not the whole disk, and run as root. |
 | zscan | zscan is not built; zscan is too old; zscan does not run here | Use the release bundle. From a git checkout: `tools/build-portable.sh` (needs Docker). |
@@ -159,11 +163,32 @@ reboot of a live system), and scan, ranking and the web UI run on the workstatio
 | devices | no ZFS member devices found | Attach the pool's disks; open encrypted ones with `cryptsetup open --readonly …`. |
 | devices | device(s) of the case do not exist here | The disks are attached to another machine (remote mode: set `ZFS_SALVAGE_HOST`), or were not opened yet. |
 | devices | not read-only | `sudo blockdev --setro <device>` (image files: `chmod a-w`). This sets a kernel flag; it does not write to the disk. |
+| import | the pool X is imported on this machine, and an import writes to the disks | ZFS has opened the pool for writing already (some live systems import everything they find). Stop it: `sudo zpool export -f X`, then run `doctor` again. Better still: work on images of the disks. |
+| import | the pool X is listed in /etc/zfs/zpool.cache | ZFS would import it the next time it starts. Move the file away: `sudo mv /etc/zfs/zpool.cache /etc/zfs/zpool.cache.off`. |
+| import | zfs-import-scan.service is enabled | At the next start ZFS imports every pool it finds. Turn it off while you work on this pool: `sudo systemctl disable zfs-import-scan.service`. |
+| smart | This disk is failing – … sectors / health check failed | The disk shows signs of dying. Make an image with `ddrescue` first and work on the image ([Failing disks](#failing-disks)). `./zfs-salvage scan` asks before it reads such a disk. |
+| smart | smartctl is not installed: nobody can tell whether the disks are healthy | `sudo apt install smartmontools`. Without it the tool cannot warn you about a dying disk. |
 | case file | no case file yet | Normal at the start: run `./zfs-salvage make-case --dev …`. |
 | case file | the case file is not valid | Create it again with `./zfs-salvage make-case`. |
 | pool features | this pool has properties that are not supported | See the [capability matrix](#capability-matrix). Tools that carve files by content (e.g. PhotoRec) can still find files. |
 | memory | only N GB RAM | Close other programs; very large pools need more. |
 | recovery host | cannot reach … over ssh | Remote mode only: set up a key login (`ssh-copy-id`), or set `ZFS_SALVAGE_HOST=local` when the disks are in this machine. |
+
+### When `make-case` says NOT SUPPORTED
+
+`./zfs-salvage make-case` refuses (exit code 2, no case file written) when the pool has a property the tool cannot handle yet.
+It names the reason and what to try instead. `--force` writes the case file anyway, marked as unsupported.
+
+| Message | What to do |
+|---|---|
+| top-level vdev N is raidz, which zfs-salvage cannot read yet | Support for raidz is planned. Until then, file carving by content (e.g. PhotoRec) on the assembled disks may find some files. Do not try to import a damaged pool. |
+| raidz vdev N has only X of Y disks here, and rebuilding a missing disk from parity is not supported | Attach the missing disk if you can. Otherwise file carving by content (e.g. PhotoRec) is the alternative. |
+| top-level vdev N is of type 'T', which is not supported | Single disks, mirrors and stripes of them are supported. File carving works on any layout. |
+| top-level vdev(s) [N] of M have no device | Attach the missing disks and run again. If a missing vdev is a "special" vdev it held the pool's metadata: the directory structure is gone with it, and only file carving by content can find files. |
+| the target dataset is natively encrypted: its files cannot be read without the keys, and decrypting is not supported | With the key, use ZFS itself on an image of the disks (`zfs load-key`). Without it nothing can read the files. |
+| a device was removed from the pool, so some blocks live at moved addresses that zfs-salvage cannot follow | Use ZFS itself on an image of the disks if the pool still opens. |
+| the target dataset's data is compressed with X, which zfs-salvage cannot decompress yet: its files would be unreadable | Support for zstd and gzip is planned. If the pool still opens in a current OpenZFS, use ZFS itself on an image of the disks. |
+| the target dataset's data uses the X checksum, which zfs-salvage cannot verify yet | Support is planned. If the pool still opens in a current OpenZFS, use ZFS itself on an image of the disks. |
 
 ## Repository layout
 

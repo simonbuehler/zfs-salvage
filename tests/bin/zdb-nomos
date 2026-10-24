@@ -1,0 +1,4 @@
+#!/bin/bash
+# A zdb whose uberblocks point at metadata that does not verify (the root block pointers carry a wrong checksum),
+# like a pool whose newest metadata is destroyed. Labels are real.
+zdb "$@" | sed -E 's/cksum=[0-9a-f]+:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+/cksum=0:0:0:0/'

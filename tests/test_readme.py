@@ -53,6 +53,20 @@ class Readme(unittest.TestCase):
         missing = [h for h in heads if re.split(r'[:(]', h)[0].strip().lower() not in table]
         self.assertEqual(missing, [], 'doctor says this, the README table does not')
 
+    def test_troubleshooting_covers_every_refusal_of_make_case(self):
+        """The fixed parts of what make-case says when it cannot help are in the README table."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('make_case_refusals', fx.SCRIPTS + '/make-case.py')
+        mc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mc)
+        table = section(readme(), 'When `make-case` says NOT SUPPORTED').lower()
+        self.assertGreaterEqual(len(mc.REFUSALS), 8)
+        for key, (sentence, _hint) in mc.REFUSALS.items():
+            for part in re.split(r'\{[^}]*\}', sentence):
+                part = part.strip(' ,:')
+                if len(part) >= 8:
+                    self.assertIn(part.lower(), table, f'refusal {key!r}: "{part}" is not in the README table')
+
 
 if __name__ == '__main__':
     unittest.main()

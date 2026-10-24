@@ -4,11 +4,13 @@
 Every line is OK, WARN or FAIL with one sentence and, if something is wrong, what to do. Exit code 1 if
 there is a FAIL. `--json` prints the same as a list for the web UI.
 
-Usage: doctor.py [--json] [--no-root]
+Usage: doctor.py [--json] [--no-root] [--smart <device>]
   --no-root   not being root is only a warning (to look around without sudo)
+  --smart D   only the SMART check of device D; exit 3 if its disk is failing (used by `./zfs-salvage scan`)
 
 For tests, system facts can be replaced with ZFS_SALVAGE_DOCTOR_FAKE='{"euid": 1000, "mem_kb": 500000, ...}'
-(keys: euid, python, mem_kb, mounts, lsblk).
+(keys: euid, python, mem_kb, mounts, lsblk, disks = {device: [physical disks]}, pool_names, services = {unit: state}).
+ZFS_SALVAGE_SMARTCTL, ZFS_SALVAGE_ZPOOL and ZFS_SALVAGE_ZPOOL_CACHE replace smartctl, zpool and the cache file path.
 """
 import ctypes
 import json
@@ -40,19 +42,25 @@ def remote(cmd, timeout=30):
     return run(common.remote_argv(cmd, opts=('-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes')), timeout)
 
 
-def mount_of(path):
-    """(mount point, file system type) of the mount that holds path."""
+def mount_info(path):
+    """(mount point, file system type, source device, options) of the mount that holds path."""
     if 'mounts' in FAKE:
-        return FAKE['mounts'].get(path) or tuple(next(iter(FAKE['mounts'].values())))
+        mp, fs = FAKE['mounts'].get(path) or next(iter(FAKE['mounts'].values()))
+        return mp, fs, FAKE.get('sources', {}).get(path, ''), FAKE.get('mount_options', {}).get(path, '')
     real = os.path.realpath(path)
-    best = ('/', '?')
+    best = ('/', '?', '', '')
     with open('/proc/mounts') as f:
         for line in f:
-            dev, mp, fs = line.split()[:3]
+            dev, mp, fs, opts = line.split()[:4]
             mp = mp.replace('\\040', ' ')
             if (real == mp or real.startswith(mp.rstrip('/') + '/')) and len(mp) >= len(best[0]):
-                best = (mp, fs)
+                best = (mp, fs, dev, opts)
     return best
+
+
+def mount_of(path):
+    """(mount point, file system type) of the mount that holds path."""
+    return mount_info(path)[:2]
 
 
 def case_devices():
@@ -72,6 +80,62 @@ def read_only(dev):
     if os.path.isfile(dev):
         return not os.stat(dev).st_mode & 0o200
     return run(['blockdev', '--getro', dev])[1].strip() == '1'
+
+
+def loop_backing(dev):
+    """The file behind /dev/loopN, or None."""
+    if dev in FAKE.get('loop_backing', {}):
+        return FAKE['loop_backing'][dev]
+    try:
+        with open(f'/sys/block/{os.path.basename(dev)}/loop/backing_file') as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def disks_of(dev, _depth=0):
+    """The physical disks below a device (partition, LUKS mapper, md, loop device): from lsblk's inverse tree; a loop
+    device belongs to the disk its backing file lives on. Image files have none."""
+    if dev in FAKE.get('disks', {}):
+        return FAKE['disks'][dev]
+    if dev in FAKE.get('loop_backing', {}) or (_depth < 3 and not os.path.isfile(dev) and os.path.basename(dev).startswith('loop')):
+        back = loop_backing(dev)
+        return disks_of(mount_info(back)[2], _depth + 1) if back and _depth < 3 else []
+    if os.path.isfile(dev) or 'disks' in FAKE:
+        return []
+    out = run(['lsblk', '-psnro', 'NAME,TYPE', dev])[1]
+    disks = []
+    for name, kind in (l.split()[:2] for l in out.splitlines() if len(l.split()) >= 2):
+        if kind == 'disk':
+            disks.append(name)
+        elif kind == 'loop' and _depth < 3:
+            disks += disks_of(name, _depth + 1)
+    return disks
+
+
+def smart_problems(disk):
+    """What smartctl says about a disk: (problems, error). problems is a list of plain-word findings, empty if healthy."""
+    smartctl = os.environ.get('ZFS_SALVAGE_SMARTCTL') or shutil.which('smartctl')
+    if not smartctl:
+        return [], 'smartctl is not installed'
+    rc, out = run([smartctl, '-j', '-H', '-A', disk])
+    try:
+        j = json.loads(out)
+    except ValueError:
+        return [], f'smartctl gave no answer for {disk}'
+    problems = []
+    if j.get('smart_status', {}).get('passed') is False:
+        problems.append('the health check failed')
+    attrs = {a.get('id'): a.get('raw', {}).get('value', 0) for a in j.get('ata_smart_attributes', {}).get('table', [])}
+    for ident, what in ((5, 'reallocated sectors'), (197, 'sectors waiting to be reallocated'), (198, 'uncorrectable sectors')):
+        if attrs.get(ident):
+            problems.append(f'{attrs[ident]} {what}')
+    nvme = j.get('nvme_smart_health_information_log', {})
+    if nvme.get('media_errors'):
+        problems.append(f'{nvme["media_errors"]} media errors')
+    if nvme.get('critical_warning'):
+        problems.append('a critical warning')
+    return problems, None
 
 
 # ---------------------------------------------------------------- checks: each returns (status, sentence, hint)
@@ -169,6 +233,79 @@ def check_devices(args):
     return OK, f'{len(devs)} device(s), all read-only: {", ".join(devs)}', ''
 
 
+def check_smart(args):
+    devs, _ = member_devices()
+    disks = sorted({d for dev in devs for d in disks_of(dev)})
+    if not disks:
+        return OK, 'no physical disks to ask (image files, or no pool devices yet)', ''
+    failing, unknown = [], None
+    for d in disks:
+        problems, err = smart_problems(d)
+        if err:
+            unknown = unknown or err
+        elif problems:
+            failing.append(f'{d}: {", ".join(problems)}')
+    if failing:
+        return WARN, f'This disk is failing – {"; ".join(failing)}', \
+            'Make an image with ddrescue first and work on the image (see the README, "Failing disks").'
+    if unknown:
+        return WARN, f'{unknown}: nobody can tell whether the disks are healthy', 'Install it: sudo apt install smartmontools'
+    return OK, f'SMART looks healthy ({", ".join(disks)})', ''
+
+
+ZPOOL_CACHE = os.environ.get('ZFS_SALVAGE_ZPOOL_CACHE') or '/etc/zfs/zpool.cache'
+
+
+def pool_names():
+    """Names of the pool(s) we are about to rescue: the case's, else the ones in the labels of the member devices."""
+    if 'pool_names' in FAKE:
+        return FAKE['pool_names']
+    if common.CASE.get('pool', {}).get('name'):
+        return [common.CASE['pool']['name']]
+    zdb = shutil.which(os.environ.get('ZFS_SALVAGE_ZDB') or 'zdb')
+    names = []
+    for dev in (member_devices()[0][:4] if zdb else []):
+        m = re.search(r"^\s+name: '([^']+)'", run([zdb, '-l', dev])[1], re.M)
+        if m and m.group(1) not in names:
+            names.append(m.group(1))
+    return names
+
+
+def service_state(unit):
+    if unit in FAKE.get('services', {}):
+        return FAKE['services'][unit]
+    return run(['systemctl', 'is-enabled', unit])[1].strip() if shutil.which('systemctl') else ''
+
+
+def check_import(args):
+    """The pool must not be imported, and nothing may import it behind our back: an import writes to the disks."""
+    names = pool_names()
+    if not names:
+        return OK, 'no pool name known yet, nothing to check', ''
+    zpool = os.environ.get('ZFS_SALVAGE_ZPOOL') or shutil.which('zpool')
+    imported = set()
+    if zpool:
+        rc, out = run([zpool, 'list', '-H', '-o', 'name'])
+        imported = set(out.split()) if rc == 0 else set()
+    for name in names:
+        if name in imported:
+            return FAIL, f'the pool {name} is imported on this machine, and an import writes to the disks', \
+                f'Stop that first: sudo zpool export -f {name}   (then check again; better still, work on images of the disks)'
+    try:
+        with open(ZPOOL_CACHE, 'rb') as f:
+            cached = f.read()
+    except OSError:
+        cached = b''
+    for name in names:
+        if name.encode() in cached:
+            return FAIL, f'the pool {name} is listed in {ZPOOL_CACHE}, so ZFS imports it the next time it starts', \
+                f'Move the file away: sudo mv {ZPOOL_CACHE} {ZPOOL_CACHE}.off'
+    if service_state('zfs-import-scan.service') == 'enabled':
+        return WARN, 'zfs-import-scan.service is enabled: at the next start ZFS imports every pool it finds', \
+            'Turn it off while you work on this pool: sudo systemctl disable zfs-import-scan.service'
+    return OK, f'{", ".join(names)} is not imported and nothing is set up to import it', ''
+
+
 def check_case(args):
     if common.CASE == {}:
         return WARN, 'no case file yet', f'The setup step creates it (scripts/make-case.py, writes to {common.CASES}).'
@@ -212,7 +349,7 @@ def check_host(args):
 
 CHECKS = [('root', check_root), ('python', check_python), ('zdb', check_zdb), ('zscan', check_zscan),
           ('libzsalvage', check_lib), ('data directory', check_data_dir), ('devices', check_devices),
-          ('case file', check_case), ('pool features', check_features), ('memory', check_ram), ('recovery host', check_host)]
+          ('import', check_import), ('smart', check_smart), ('case file', check_case), ('pool features', check_features), ('memory', check_ram), ('recovery host', check_host)]
 
 
 def run_checks(args):
@@ -226,8 +363,24 @@ def run_checks(args):
     return results
 
 
+def smart_only(dev):
+    """For `./zfs-salvage scan`: say whether the disk below dev is failing. Exit 3 if so, else 0."""
+    failing = []
+    for d in disks_of(dev):
+        problems, _ = smart_problems(d)
+        if problems:
+            failing.append(f'{d}: {", ".join(problems)}')
+    if failing:
+        print(f'This disk is failing – {"; ".join(failing)}.\nEvery pass over it costs life. Make an image with ddrescue first '
+              'and work on the image (README, "Failing disks").')
+        return 3
+    return 0
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    if '--smart' in argv:
+        return smart_only(argv[argv.index('--smart') + 1])
 
     class A:
         no_root = '--no-root' in argv

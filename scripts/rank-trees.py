@@ -98,6 +98,7 @@ def min_birth_during_scan():
     return newest - newest // 5 if newest else 0
 
 
+MAX_STATES = 400        # states of the target kept for the status page (consecutive identical ones are collapsed)
 SAME_FS = 0.5           # two trees whose top-level names overlap at least this much (Jaccard) are one file system
 MAX_GROUP_NAMES = 100
 
@@ -203,7 +204,7 @@ def run(limit):
                       # how to read this candidate (for catalog rebuild / extraction)
                       'candidate': {'kind': r['kind'], 'offset': r['offset'], 'comp': c[2], 'psize': int(c[3]),
                                     'lsize': int(c[4])} if c else None})
-        if len(table) >= 15:
+        if len(table) >= MAX_STATES:
             break
     root = next((t for t in table if t['kind'].startswith('L') and t['candidate']), None)
     if root:                                   # measured on a verified tree of the target: the true layout

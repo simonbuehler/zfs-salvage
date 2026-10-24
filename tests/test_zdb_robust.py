@@ -1,5 +1,6 @@
-"""make-case survives a zdb that hangs, aborts or is missing, and the metadata layout is taken from a
-verified tree instead of being guessed."""
+"""make-case survives a zdb that is missing, hangs or aborts, and a pool whose metadata does not verify; the
+metadata layout is taken from a verified tree instead of being guessed. Only the label calls
+(`zdb -l`, `-luuuu`) are made, so a zdb that fails on every other call does not matter any more."""
 import gzip
 import json
 import os
@@ -43,7 +44,7 @@ class FlakyZdb(unittest.TestCase):
     def tearDownClass(cls):
         fx.rmtree(cls.dir)
 
-    def run_flaky(self, mode, variant='modern-single'):
+    def run_flaky(self, mode, variant='modern-single', zdb='zdb-flaky'):
         if not fx.have_images(variant):
             self.skipTest(f'no {variant} images')
         fx.unpack(variant, os.path.join(self.dir, 'img', variant))
@@ -51,7 +52,7 @@ class FlakyZdb(unittest.TestCase):
         t0 = time.time()
         r = subprocess.run(['docker', 'run', '--rm', '-e', f'FLAKY={mode}', '-v', f'{os.path.join(self.dir, "img")}:/img:ro',
                             '-v', f'{self.out}:/out', '-v', f'{fx.SCRIPTS}:/s:ro', '-v', f'{BIN}:/b:ro', tmc.IMAGE,
-                            'python3', '/s/make-case.py', '--zdb', '/b/zdb-flaky', '--zdb-timeout', '5', '--zdb-budget', '12',
+                            'python3', '/s/make-case.py', '--zdb', f'/b/{zdb}', '--zdb-timeout', '5', '--zdb-budget', '12',
                             '--yes', '--target', f'fx-{variant}/home', '--root-names', 'docs', '--name', name,
                             '--out', '/out', '--dev', f'/img/{variant}/d0.img'],
                            capture_output=True, text=True, timeout=300)
@@ -59,25 +60,24 @@ class FlakyZdb(unittest.TestCase):
             case = json.load(f)
         return r, case, time.time() - t0
 
-    def check(self, mode, needle):
-        r, case, secs = self.run_flaky(mode)
+    def test_zdb_that_hangs_or_aborts_on_other_calls_does_not_matter(self):
+        for mode in ('hang', 'abort'):
+            with self.subTest(mode):
+                r, case, secs = self.run_flaky(mode)
+                self.assertEqual(r.returncode, 0, r.stdout[-800:])
+                self.assertEqual(validate(case), [], 'a complete case, as if zdb worked')
+                self.assertEqual(case['problems'], [])
+                self.assertEqual(case['profile']['meta_dnode_levels'], 6)
+                self.assertLess(secs, 60)
+
+    def test_metadata_that_does_not_verify_gives_a_partial_case(self):
+        r, case, secs = self.run_flaky('abort', zdb='zdb-nomos')
         self.assertEqual(r.returncode, 0, r.stdout[-800:])
+        self.assertIn("no uberblock's metadata is readable", r.stdout)
         self.assertEqual(validate(case, partial=True), [])
         self.assertEqual(case['pool']['name'], 'fx-modern-single')              # from the label
-        self.assertTrue(case['timeline'], 'uberblock timeline from zdb -lu')
+        self.assertTrue(case['timeline'], 'uberblock timeline from zdb -luuuu')
         self.assertEqual(case['datasets'], [])
-        self.assertTrue(any(needle in p for p in case['problems']), case['problems'])
-        self.assertLess(secs, 90)
-        return case
-
-    def test_zdb_that_hangs(self):
-        self.check('hang', 'timeout after 5 s')
-
-    def test_zdb_that_aborts(self):
-        self.check('abort', 'SIGABRT')
-
-    def test_partial_case_is_not_valid_as_a_full_one(self):
-        r, case, _ = self.run_flaky('abort')
         self.assertIn('profile.meta_dnode_levels', ' '.join(validate(case)).replace('missing: ', ''))
 
 

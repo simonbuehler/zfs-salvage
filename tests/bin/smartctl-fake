@@ -1,0 +1,10 @@
+#!/bin/bash
+# A smartctl (-j -H -A) with a chosen answer: FAKE_SMART=healthy|pending|reallocated|failed|nvme|garbage
+case "${FAKE_SMART:-healthy}" in
+  healthy)     echo '{"smart_status":{"passed":true},"ata_smart_attributes":{"table":[{"id":5,"raw":{"value":0}},{"id":197,"raw":{"value":0}},{"id":198,"raw":{"value":0}}]}}' ;;
+  pending)     echo '{"smart_status":{"passed":true},"ata_smart_attributes":{"table":[{"id":5,"raw":{"value":0}},{"id":197,"raw":{"value":8}},{"id":198,"raw":{"value":0}}]}}' ;;
+  reallocated) echo '{"smart_status":{"passed":true},"ata_smart_attributes":{"table":[{"id":5,"raw":{"value":120}},{"id":197,"raw":{"value":0}}]}}' ;;
+  failed)      echo '{"smart_status":{"passed":false},"ata_smart_attributes":{"table":[]}}'; exit 4 ;;
+  nvme)        echo '{"smart_status":{"passed":true},"nvme_smart_health_information_log":{"media_errors":3,"critical_warning":0}}' ;;
+  garbage)     echo 'Smartctl open device: /dev/sdz failed: No such device'; exit 2 ;;
+esac

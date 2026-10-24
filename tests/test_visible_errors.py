@@ -17,11 +17,19 @@ FAKE_BIN = os.path.join(fx.TESTS, 'bin')
 EXAMPLE_CASE = os.path.join(fx.REPO, 'cases', 'example.json')
 
 
+TOKEN = 'test-token'                 # what the web server of the tests expects (X-ZS-Token header)
+
+
 def env_for(state, mode, **extra):
-    e = dict(os.environ, PATH=FAKE_BIN + os.pathsep + os.environ['PATH'], FAKE_SSH=mode,
+    e = dict(os.environ, PATH=FAKE_BIN + os.pathsep + os.environ['PATH'], FAKE_SSH=mode, ZFS_SALVAGE_TOKEN=TOKEN,
              ZFS_SALVAGE_HOST='fakehost', ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_CASE=EXAMPLE_CASE)
     e.update(extra)
     return e
+
+
+def authed(url):
+    """A request for the web server of the tests, with the session token."""
+    return urllib.request.Request(url, headers={'X-ZS-Token': TOKEN})
 
 
 def run_status_page(state, mode, **extra):
@@ -109,11 +117,11 @@ class WebServer(unittest.TestCase):
             while time.time() < deadline and 'is unreachable' not in text:
                 time.sleep(1)
                 try:
-                    text = urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=5).read().decode()
+                    text = urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/'), timeout=5).read().decode()
                 except OSError:
                     pass
             self.assertIn('is unreachable', text)
-            wf = json.load(urllib.request.urlopen(f'http://127.0.0.1:{port}/api/workflow', timeout=5))
+            wf = json.load(urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/api/workflow'), timeout=5))
             self.assertTrue(wf['alerts'])
         finally:
             proc.terminate()

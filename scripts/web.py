@@ -9,15 +9,18 @@ Reads catalog/catalog.sqlite (catalog.py). The selection is stored in column ent
 (survives restarts); every change is also logged to catalog/selection_rules.jsonl.
 The catalog can be rebuilt from the newest verified state with one click (POST /api/catalog/rebuild).
 """
+import hmac
 import json
 import os
+import secrets
 import sqlite3
 import subprocess
 import sys
 import threading
 import time
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import status_page  # noqa: E402
@@ -30,6 +33,15 @@ RULES = f'{CATALOG}/selection_rules.jsonl'
 UI = f'{REPO}/scripts/ui/index.html'
 STATUS_PAGE = f'{STATUS}/index.html'
 PORT = int(os.environ.get('SALVAGE_UI_PORT', 8765))
+
+# The server usually runs as root and can copy files anywhere: nothing else on this machine, and no web page the
+# user happens to visit, may talk to it. Every request needs the per-session token (cookie or X-ZS-Token header; the
+# launcher opens /?t=<token>, which sets the cookie), the Host must be this machine (DNS rebinding) and an Origin,
+# if the browser sends one, must be this page (cross-site requests).
+TOKEN = os.environ.get('ZFS_SALVAGE_TOKEN') or secrets.token_urlsafe(24)
+COOKIE = f'zs_token_{PORT}'                      # cookies are not separated by port: one name per port
+ALLOWED_HOSTS = {f'localhost:{PORT}', f'127.0.0.1:{PORT}', f'[::1]:{PORT}'}
+ALLOWED_ORIGINS = {f'http://{h}' for h in ALLOWED_HOSTS}
 
 
 def db():
@@ -238,8 +250,35 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def guard(self, u):
+        """True if the request may be served; otherwise the answer (403, or the redirect that sets the cookie) is sent."""
+        if self.headers.get('Host', '') not in ALLOWED_HOSTS:
+            self.send({'error': 'unexpected Host header'}, 403)
+            return False
+        origin = self.headers.get('Origin')
+        if origin is not None and origin not in ALLOWED_ORIGINS:
+            self.send({'error': 'foreign Origin'}, 403)
+            return False
+        cookie = SimpleCookie(self.headers.get('Cookie', '')).get(COOKIE)
+        supplied = self.headers.get('X-ZS-Token') or (cookie.value if cookie else '')
+        if hmac.compare_digest(supplied.encode(), TOKEN.encode()):
+            return True
+        q = parse_qs(u.query)
+        if self.command == 'GET' and hmac.compare_digest(q.get('t', [''])[0].encode(), TOKEN.encode()):
+            rest = urlencode([(k, v) for k, vs in q.items() if k != 't' for v in vs])
+            self.send_response(302)
+            self.send_header('Location', u.path + (f'?{rest}' if rest else ''))
+            self.send_header('Set-Cookie', f'{COOKIE}={TOKEN}; Path=/; HttpOnly; SameSite=Strict')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return False
+        self.send({'error': 'forbidden: open the link that zfs-salvage printed (it ends in ?t=…)'}, 403)
+        return False
+
     def do_GET(self):
         u = urlparse(self.path)
+        if not self.guard(u):
+            return
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path in ('/', '/index.html', '/status'):
             if os.path.exists(STATUS_PAGE):
@@ -294,6 +333,8 @@ class H(BaseHTTPRequestHandler):
         self.send({'error': 'unknown'}, 404)
 
     def do_POST(self):
+        if not self.guard(urlparse(self.path)):
+            return
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if self.path == '/api/catalog/rebuild':
             return self.send(rebuild_catalog(body.get('candidate')))
@@ -351,5 +392,5 @@ def status_loop():
 if __name__ == '__main__':
     ensure_schema()
     threading.Thread(target=status_loop, daemon=True).start()
-    print(f'zfs-salvage web UI: http://localhost:{PORT}', file=sys.stderr)
+    print(f'zfs-salvage web UI: http://localhost:{PORT}/?t={TOKEN}   (open this link; others are refused)', file=sys.stderr)
     ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

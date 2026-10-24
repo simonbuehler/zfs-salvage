@@ -19,9 +19,14 @@ kind = OBJSET or IND (the root indirect block of a meta-dnode tree, L6 on a 7-le
   batch                     candidates on stdin (+ birth), one JSON result line each
   extract <candidate>       'obj<TAB>path' lines on stdin -> tar stream on stdout,
                             manifest lines on stderr
+  datasets [--large-dnodes <dataset>] <pool> <rootbp>...  the datasets of a pool, found by walking MOS -> DSL directories (no import, no zdb).
+                            Each <rootbp> is the text zdb prints as `rootbp = DVA[0]=<…> …` for an uberblock
+                            (zdb -luuuu), newest first; the first one whose MOS verifies is used. One JSON line.
 """
 import hashlib
+import json
 import os
+import re
 import struct
 import sys
 import time
@@ -963,11 +968,157 @@ def cmd_extract(args):
     print(f'S\t{json.dumps(dev.stats)}', file=sys.stderr, flush=True)
 
 
+# ---------------------------------------------------------------- datasets (MOS -> DSL), for make-case
+CKSUM_NAMES = {1: 'on', 2: 'off', 3: 'label', 4: 'gang_header', 5: 'zilog', 6: 'fletcher2', 7: 'fletcher4', 8: 'sha256',
+               9: 'zilog2', 10: 'noparity', 11: 'sha512', 12: 'skein', 13: 'edonr', 14: 'blake3'}
+COMP_NAMES = {1: 'on', 2: 'uncompressed', 3: 'lzjb', 4: 'empty', 14: 'zle', 15: 'lz4', 16: 'zstd',
+              **{4 + i: f'gzip-{i}' for i in range(1, 10)}}
+OT_IDS = {'DMU objset': 11, 'DMU dnode': 10}
+OS_TYPES = {1: 'META', 2: 'ZPL', 3: 'ZVOL'}
+
+
+def bp_from_text(text):
+    """A blkptr_t from the text zdb prints for it: `DVA[0]=<0:3083000:1000> … [L0 DMU objset] fletcher4
+    uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=…`"""
+    dvas = re.findall(r'DVA\[(\d)\]=<(\d+):([0-9a-f]+):([0-9a-f]+)(G?)>', text)
+    head = re.search(r'\[L(\d+) ([^\]]+)\] (\S+) (\S+) (\S+)', text)
+    size = re.search(r'size=([0-9a-f]+)L/([0-9a-f]+)P', text)
+    birth = re.search(r'birth=(\d+)L/(\d+)P', text)
+    fill = re.search(r'fill=(\d+)', text)
+    ck = re.search(r'cksum=([0-9a-f]+):([0-9a-f]+):([0-9a-f]+):([0-9a-f]+)', text)
+    if not (dvas and head and size and birth and fill and ck):
+        raise ValueError(f'not a block pointer: {text[:80]!r}')
+    level, typename, cksum, comp, crypt = head.groups()
+    ids = {v: k for k, v in CKSUM_NAMES.items()}, {v: k for k, v in COMP_NAMES.items()}
+    if typename not in OT_IDS or cksum not in ids[0] or comp not in ids[1]:
+        raise ValueError(f'unknown type, checksum or compression in {text[:80]!r}')
+    w = [0] * 16
+    for i, vdev, off, asize, gang in dvas:
+        k = int(i)
+        w[2 * k] = (int(vdev) << 32) | (int(asize, 16) >> 9)
+        w[2 * k + 1] = (int(off, 16) >> 9) | ((1 << 63) if gang else 0)
+    lsize, psize = int(size.group(1), 16), int(size.group(2), 16)
+    w[6] = ((lsize // 512 - 1) | ((psize // 512 - 1) << 16) | (ids[1][comp] << 32) | (ids[0][cksum] << 40)
+            | (OT_IDS[typename] << 48) | (int(level) << 56) | ((1 << 63) if ' LE ' in text else 0)
+            | ((1 << 61) if crypt != 'unencrypted' else 0))
+    w[9], w[10], w[11] = int(birth.group(2)), int(birth.group(1)), int(fill.group(1))
+    w[12:16] = [int(x, 16) for x in ck.groups()]
+    return struct.pack('<16Q', *w)
+
+
+def nicenum(n):
+    """Size as zdb prints it: 3 significant digits and a unit (304K, 5.69M)."""
+    for unit, shift in (('', 0), ('K', 10), ('M', 20), ('G', 30), ('T', 40), ('P', 50)):
+        if n < 1 << (shift + 10) or unit == 'P':
+            v = n / (1 << shift)
+            text = f'{v:.0f}' if shift == 0 else (f'{v:.2f}' if v < 10 else f'{v:.1f}' if v < 100 else f'{v:.0f}')
+            return (text.rstrip('0').rstrip('.') if '.' in text else text) + unit
+    return str(n)
+
+
+def has_large_dnodes(os_, budget=60):
+    """True if a dnode of the dataset spans more than one 512-byte slot (dn_extra_slots), False if none does,
+    None if that could not be told (unreadable meta-dnode blocks or out of time)."""
+    t0, complete = time.time(), True
+    bad = []
+    for blkid in os_.meta.data_blocks(os_.dev, bad=bad):
+        if time.time() - t0 > budget:
+            return None
+        try:
+            block = os_.meta.read_block(os_.dev, blkid)
+        except ReadError:
+            complete = False
+            continue
+        for slot in range(len(block) // 512):
+            if block[512 * slot] and block[512 * slot + 12]:
+                return True
+    return False if complete and not bad else None
+
+
+def dataset_info(dev, name, dsobj, ds, check_large_dnodes=False):
+    """One dataset from its DSL dataset bonus buffer: the fields `zdb -d` lists, plus what make-case needs."""
+    creation_txg, = struct.unpack_from('<Q', ds.bonus, 56)
+    referenced, = struct.unpack_from('<Q', ds.bonus, 72)
+    bp = BP(ds.bonus[128:256])
+    info = {'name': name, 'id': dsobj, 'cr_txg': creation_txg, 'size': nicenum(referenced), 'objects': bp.fill,
+            'checksum': CKSUM_NAMES.get(bp.cksum_alg), 'compression': COMP_NAMES.get(bp.comp),
+            'encrypted': bool((bp.w[6] >> 61) & 1), 'objset_birth': bp.birth, 'readable': False}
+    try:
+        block = read_bp(dev, bp)
+    except ReadError as e:
+        info['error'] = str(e)
+        return info
+    os_type = struct.unpack_from('<Q', block, 704)[0] if len(block) >= 712 else 2
+    os_ = Objset(dev, meta_from_objset_block(block), os_type)
+    info.update(readable=True, type=OS_TYPES.get(os_type), os_type=os_type,
+                meta_dnode={'nlevels': os_.meta.nlevels, 'indirect_block_size': 1 << os_.meta.indblkshift,
+                            'dnode_block_size': os_.meta.blksz})
+    if check_large_dnodes:                         # reads the whole meta-dnode: only for the dataset asked about
+        try:
+            info['large_dnodes'] = has_large_dnodes(os_)
+        except ReadError:
+            info['large_dnodes'] = None
+    return info
+
+
+def datasets_of(dev, pool, rootbp_text, large_dnodes=()):
+    """The datasets and pool features visible from one uberblock's root block. Raises ReadError if the MOS
+    cannot be read."""
+    block = read_bp(dev, BP(bp_from_text(rootbp_text)))
+    mos = Objset(dev, meta_from_objset_block(block), 1)
+    directory = zap_read(mos, 1)                      # object directory
+    result = {'datasets': [], 'features_for_read': {}, 'features_for_write': {}, 'errors': []}
+    for key in ('features_for_read', 'features_for_write'):
+        if directory.get(key):
+            try:
+                result[key] = {k: v for k, v in zap_read(mos, directory[key]).items() if isinstance(v, int)}
+            except ReadError as e:
+                result['errors'].append(f'{key}: {e}')
+    stack = [(pool, directory['root_dataset'])]
+    while stack:
+        name, dirobj = stack.pop()
+        try:
+            d = mos.dnode(dirobj)
+            head, = struct.unpack_from('<Q', d.bonus, 8)
+            child_zap, = struct.unpack_from('<Q', d.bonus, 32)
+            if head:
+                result['datasets'].append(dataset_info(dev, name, head, mos.dnode(head), name in large_dnodes))
+            if child_zap:
+                for cname, cobj in sorted(zap_read(mos, child_zap).items(), reverse=True):
+                    if not cname.startswith(('$', '%')):          # $ORIGIN, $MOS, $FREE, %recv: no user data
+                        stack.append((f'{name}/{cname}', cobj))
+        except (ReadError, struct.error) as e:
+            result['errors'].append(f'{name}: {e}')
+    result['datasets'].sort(key=lambda x: x['name'])
+    return result
+
+
+def cmd_datasets(args):
+    large = []
+    while len(args) >= 2 and args[0] == '--large-dnodes':           # also check these datasets for large dnodes
+        large.append(args[1])
+        args = args[2:]
+    if len(args) < 2:
+        raise SystemExit('usage: zsread.py datasets [--large-dnodes <dataset>]... <pool> <rootbp text>...')
+    pool, tried = args[0], []
+    dev = Dev()
+    for i, text in enumerate(args[1:]):
+        try:
+            res = datasets_of(dev, pool, text, large)
+        except (ReadError, ValueError, KeyError, struct.error) as e:
+            tried.append({'index': i, 'error': f'{type(e).__name__}: {e}'})
+            continue
+        print(json.dumps({'rootbp_index': i, 'tried': tried, **res}, ensure_ascii=False))
+        return
+    print(json.dumps({'rootbp_index': None, 'tried': tried, 'datasets': [], 'features_for_read': {},
+                      'features_for_write': {}, 'errors': []}))
+
+
 if __name__ == '__main__':
     if LIB_ERROR:
         print(f'zsread: SLOW MODE - {LIB_ERROR}; using the pure-Python fallback (works, but much slower). '
               'Install it with scripts/deploy-tools.sh.', file=sys.stderr, flush=True)
-    cmds = {'probe': cmd_probe, 'tree': cmd_tree, 'batch': cmd_batch, 'extract': cmd_extract}
+    cmds = {'probe': cmd_probe, 'tree': cmd_tree, 'batch': cmd_batch, 'extract': cmd_extract, 'datasets': cmd_datasets}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__)
         sys.exit(2)

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """make-case - inspect a damaged ZFS pool (read-only) and write a case file for zfs-salvage.
 
-Runs on the recovery host. Uses `zdb` (a recent OpenZFS build is recommended) and only
-reads from the devices. Everything that is specific to one pool ends up in the case file;
+Runs on the recovery host. Uses `zdb -l`/`-luuuu` (labels and uberblocks: they never open the pool) and
+`zsread.py datasets` (our own reader walks the pool's metadata); only reads from the devices, nothing is imported. Everything that is specific to one pool ends up in the case file;
 the other tools read it instead of hardcoding assumptions.
 
-Steps: find devices -> read labels -> uberblock timeline -> try to open the pool at
-recent TXGs -> list datasets (readable / unreadable) -> derive the on-disk profile ->
+Steps: find devices -> read labels -> uberblock timeline -> read the datasets from the newest
+uberblock whose metadata verifies (readable / unreadable) -> derive the on-disk profile ->
 ask for the target dataset -> compatibility check -> write cases/<name>.json
 
 Usage:
@@ -21,7 +21,6 @@ import re
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 
 # What zfs-salvage supports (README capability matrix). Extend here when you add support.
@@ -30,18 +29,36 @@ SUPPORTED = {
     'compression': {'off', 'uncompressed', 'on', 'lzjb', 'lz4'},      # of the target dataset's data blocks
     'checksum': {'on', 'fletcher4', 'sha256'},
 }
-HINTS = {
-    'zstd': 'Add zstd (ZFS uses a 4-byte header before the frame) to libzsalvage, zscan and zsread.',
-    'gzip': 'Add zlib inflate (gzip-1..9) to libzsalvage, zscan and zsread.',
-    'raidz': 'RAIDZ: scan each child disk and map physical to logical offsets using the raidz geometry; '
-             'reads must reconstruct from data columns (and parity on errors).',
-    'draid': 'dRAID is not supported; see the raidz hint plus the permutation tables.',
-    'checksum': 'Add the checksum algorithm to zsread.checksum() (and zscan bp_ok if metadata uses it).',
-    'large_dnode': 'large_dnode: dnodes may span several 512-byte slots (dn_extra_slots); adapt zscan/zsread.',
-    'encryption': 'Native encryption: data and most metadata are encrypted; requires the key and AES-GCM/CCM.',
-    'missing': 'Attach all devices of the pool (every top-level vdev) and try again.',
-    'removal': 'Device removal leaves "indirect" vdevs that map old offsets to new ones; not supported.',
+# What the tool says when it cannot help: (what is wrong, what to do instead). Plain words; {x} are filled in.
+# The README's troubleshooting table repeats the fixed parts (tests/test_readme.py checks that).
+REFUSALS = {
+    'raidz': ('top-level vdev {id} is {type}, which zfs-salvage cannot read yet',
+              'Support for raidz is planned. Until then, file carving by content (e.g. PhotoRec) on the '
+              'assembled disks may find some files. Do not try to import a damaged pool.'),
+    'raidz-degraded': ('raidz vdev {id} has only {have} of {total} disks here, and rebuilding a missing disk from parity is not supported',
+                       'Attach the missing disk if you can. Otherwise file carving by content (e.g. PhotoRec) is the alternative.'),
+    'layout': ("top-level vdev {id} is of type '{type}', which is not supported",
+               'Single disks, mirrors and stripes of them are supported. File carving by content (e.g. PhotoRec) works on any layout.'),
+    'missing': ('top-level vdev(s) {missing} of {want} have no device',
+                'Attach the missing disks and run again. If a missing vdev is a "special" vdev it held the metadata of the pool: '
+                'then the directory structure is gone with it, and only file carving by content (e.g. PhotoRec) can find files.'),
+    'encryption': ('the target dataset is natively encrypted: its files cannot be read without the keys, and decrypting is not supported',
+                   'With the key, use ZFS itself on an image of the disks (zfs load-key). Without it, nothing can read the files, '
+                   'and carving finds only encrypted noise.'),
+    'removal': ('a device was removed from the pool, so some blocks live at moved addresses that zfs-salvage cannot follow',
+                'Use ZFS itself on an image of the disks if the pool still opens.'),
+    'compression': ("the target dataset's data is compressed with {what}, which zfs-salvage cannot decompress yet: its files would be unreadable",
+                    'Support for zstd and gzip is planned. If the pool still opens in a current OpenZFS, use ZFS '
+                    'itself on an image of the disks.'),
+    'checksum': ("the target dataset's data uses the {what} checksum, which zfs-salvage cannot verify yet",
+                 'Support is planned. If the pool still opens in a current OpenZFS, use ZFS itself on an image of the disks.'),
 }
+
+
+def refusal(key, **kw):
+    sentence, hint = REFUSALS[key]
+    return sentence.format(**kw), hint
+
 
 
 PROBLEMS = []                  # one line per zdb call that failed; written to the case file
@@ -49,14 +66,14 @@ ZDB_TIMEOUT = 120              # seconds per zdb call (--zdb-timeout)
 CRASH_CODES = {134: 'SIGABRT (assertion failed)', 139: 'SIGSEGV', 136: 'SIGFPE', 132: 'SIGILL', 135: 'SIGBUS'}
 
 
-def sh(cmd, timeout=None):
+def sh(cmd, timeout=None, env=None):
     """Run a command and return stdout+stderr. A missing program, a timeout or a crash (zdb aborts on
     damaged pools, older versions even crash the kernel) is recorded in PROBLEMS and answered with the
     output so far instead of an exception."""
     timeout = timeout or ZDB_TIMEOUT
     what = ' '.join(str(c) for c in cmd[:2]) + (' ' + ' '.join(str(c) for c in cmd[-2:]) if len(cmd) > 4 else '')
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
     except FileNotFoundError:
         PROBLEMS.append(f'{cmd[0]} not found')
         print(f'   PROBLEM: {cmd[0]} not found')
@@ -131,9 +148,11 @@ def read_label(zdb, dev):
 
 
 def read_uberblocks(zdb, devs):
-    ubs = {}
+    """(txg, timestamp) of all uberblocks of the given devices, oldest first, and {txg: text of its root block
+    pointer}. `zdb -luuuu` reads the labels only; it does not open the pool."""
+    ubs, rootbps = {}, {}
     for d in devs:
-        out = sh([zdb, '-lu', d])
+        out = sh([zdb, '-luuuu', d])
         txg = None
         for line in out.splitlines():
             m = re.search(r'\btxg = (\d+)', line)
@@ -142,107 +161,34 @@ def read_uberblocks(zdb, devs):
             m = re.search(r'timestamp = (\d+)', line)
             if m and txg is not None:
                 ubs.setdefault(txg, int(m.group(1)))
-    return sorted(ubs.items())
+            m = re.search(r'\brootbp = (DVA\[.*)$', line)
+            if m and txg is not None:
+                rootbps.setdefault(txg, m.group(1))
+    return sorted(ubs.items()), rootbps
 
 
-def try_open(zdb, devdir, pool, txgs, limit=40, budget=600):
-    """Newest TXGs first; returns (txg, zdb -d output) of the first TXG where the pool opens. Gives up
-    after `limit` TXGs or `budget` seconds."""
-    tried, t0, failed_in_a_row = [], time.time(), 0
-    for txg in sorted(txgs, reverse=True)[:limit]:
-        if failed_in_a_row >= 3:
-            PROBLEMS.append('zdb failed on 3 TXGs in a row, not trying more')
-            print('   PROBLEM: zdb failed on 3 TXGs in a row, not trying more')
-            break
-        if time.time() - t0 > budget:
-            PROBLEMS.append(f'gave up opening the pool after {len(tried)} TXGs ({budget} s)')
-            print(f'   PROBLEM: gave up opening the pool after {len(tried)} TXGs ({budget} s)')
-            break
-        before = len(PROBLEMS)
-        out = sh([zdb, '-e', '-p', devdir, '-t', str(txg), '-d', pool])
-        failed_in_a_row = failed_in_a_row + 1 if len(PROBLEMS) > before else 0
-        ok = 'Dataset ' in out and "can't open" not in out.split('Dataset ')[0]
-        tried.append((txg, ok))
-        if ok:
-            return txg, out, tried
-    return None, '', tried
+ZSREAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'zsread.py')
 
 
-DATASET_RE = re.compile(r'^Dataset (\S+) \[(\w+)\], ID (\d+), cr_txg (\d+), (\S+), (\d+) objects(?:, rootbp (.*))?$', re.M)
-
-
-def parse_datasets(out):
-    """Datasets from `zdb -d` / `zdb -dddd <dataset> 0`. The rootbp part (checksum, compression and
-    encryption of the objset block) is only printed by some zdb versions or at higher verbosity."""
-    ds = []
-    for m in DATASET_RE.finditer(out):
-        name, typ, did, cr, size, objs, bp = m.groups()
-        comp = re.search(r'\] (\w+) (\w+) (unencrypted|encrypted|authenticated)', bp or '')
-        birth = re.search(r'birth=(\d+)L', bp or '')
-        ds.append({'name': name, 'type': typ, 'id': int(did), 'cr_txg': int(cr), 'size': size,
-                   'objects': int(objs), 'checksum': comp.group(1) if comp else None,
-                   'compression': comp.group(2) if comp else None,
-                   'encrypted': bool(comp and comp.group(3) != 'unencrypted'),
-                   'objset_birth': int(birth.group(1)) if birth else None, 'readable': True})
-    for m in re.finditer(r"failed to hold dataset '([^']+)': (.*)$", out, re.M):
-        ds.append({'name': m.group(1), 'readable': False, 'error': m.group(2).strip()})
-    return ds
-
-
-def dataset_header(zdb, devdir, pool, txg, name):
-    """The header line of one dataset (`zdb -dddd <dataset> 0`): checksum, compression and encryption of
-    its objset block. {} if the dataset cannot be opened."""
-    cmd = [zdb, '-e', '-p', devdir] + (['-t', str(txg)] if txg else []) + ['-dddd', name, '0']
-    found = [d for d in parse_datasets(sh(cmd)) if d['name'] == name and d['readable']]
-    return found[0] if found else {}
-
-
-def has_large_dnodes(zdb, devdir, pool, txg, name):
-    """True/False if the dataset has dnodes larger than 512 bytes (`dnsize` column of `zdb -dd`), None if
-    that could not be determined (timeout, unreadable)."""
-    cmd = [zdb, '-e', '-p', devdir] + (['-t', str(txg)] if txg else []) + ['-dd', name]
-    try:
-        out = sh(cmd, timeout=min(180, ZDB_TIMEOUT))
-    except subprocess.TimeoutExpired:
-        return None
-    sizes = re.findall(r'^\s+\d+\s+\d+\s+\S+\s+\S+\s+\S+\s+(\S+)\s+\S+\s+\S+\s+\S', out, re.M)
-    return any(x != '512' for x in sizes) if sizes else None
-
-
-def pool_features(zdb, devdir, pool, txg):
-    """Active pool features with their reference counts, from the MOS object `features_for_write`
-    (per-dataset features such as encryption and large_dnode are not listed there)."""
-    base = [zdb, '-e', '-p', devdir] + (['-t', str(txg)] if txg else [])
-    m = re.search(r'features_for_write = (\d+)', sh(base + ['-dddd', pool, '1']))
-    if not m:
-        return {}
-    out = sh(base + ['-dddd', pool, m.group(1)])
-    return {k: int(v) for k, v in re.findall(r'^\s+((?:com|org)\.[\w.]+:\w+) = (\d+)', out, re.M)}
-
-
-def meta_dnode_profile(zdb, devdir, pool, txg, ds_name):
-    """Indirect block size and levels of the meta-dnode of a readable dataset (object 0)."""
-    out = sh([zdb, '-e', '-p', devdir, '-t', str(txg), '-dddd', ds_name, '0'])
-    m = re.search(r'^\s+0\s+(\d+)\s+(\S+)\s+(\S+)\s+\S+\s+(\S+)?.*DMU dnode', out, re.M)
-    if not m:
-        return {}
-    to_bytes = lambda s: int(float(s[:-1]) * {'K': 1024, 'M': 1 << 20}[s[-1]]) if s[-1] in 'KM' else int(s)
-    return {'meta_dnode_levels': int(m.group(1)), 'indirect_block_size': to_bytes(m.group(2)),
-            'dnode_block_size': to_bytes(m.group(3))}
-
-
-def target_info(zdb, devdir, pool, txg, ds_name):
-    """Head dataset object of an unreadable dataset via the MOS (birth of its objset bp)."""
-    out = sh([zdb, '-e', '-p', devdir, '-t', str(txg), '-dddd', f'{pool}/0'])
-    info = {}
-    # find the DSL directory whose name maps to ds_name is not trivial from zdb output; use used_bytes
-    for block in out.split('\n\n'):
-        if 'DSL dataset' in block and 'bp = ' in block:
-            m = re.search(r'\bbp = .*birth=(\d+)L.*fill=(\d+)', block)
-            if m:
-                info.setdefault('objset_candidates', []).append(
-                    {'birth': int(m.group(1)), 'fill': int(m.group(2))})
-    return info
+def zsread_datasets(labels, pool, rootbps, timeout, large_dnodes=()):
+    """Run `zsread.py datasets` (it walks MOS -> DSL directories itself, nothing is imported): newest root block
+    first, the first whose MOS verifies is used. Returns the parsed answer, or None if zsread failed."""
+    groups = vdev_groups(labels)
+    env = dict(os.environ, ZSREAD_LABEL_START=str(4 << 20))
+    if groups and all(l.get('top_id') is not None for l in labels):
+        env['ZSREAD_VDEVS'] = ';'.join(f"{g['id']}={','.join(g['devices'])}" for g in groups)
+    else:
+        env['ZSREAD_DEVS'] = ':'.join(l['device'] for l in labels)
+    cmd = [sys.executable, '-I', ZSREAD, 'datasets', *sum([['--large-dnodes', n] for n in large_dnodes], []), pool, *rootbps]
+    out = sh(cmd, timeout=timeout, env=env)
+    for line in out.splitlines():
+        if line.startswith('{'):
+            try:
+                return json.loads(line)
+            except ValueError:
+                pass
+    PROBLEMS.append(f'zsread datasets gave no answer: {out.strip()[-200:] or "no output"}')
+    return None
 
 
 # ------------------------------------------------------------------ main
@@ -250,7 +196,7 @@ def check_compat(lab, labels, datasets, target, prof):
     """(problems, warnings): lists of (kind, value, sentence, hint). Problems stop make-case (exit 2).
 
     lab: label of one device (pool-wide fields), labels: labels of all given devices (they carry the
-    top-level vdev id and type), datasets: parsed `zdb -d` output (may be empty), target: dataset name.
+    top-level vdev id and type), datasets: from `zsread.py datasets` (may be empty), target: dataset name.
     """
     problems, warnings = [], []
     tgt0 = next((d for d in datasets if d['name'] == target), None)
@@ -260,21 +206,20 @@ def check_compat(lab, labels, datasets, target, prof):
 
     for g in groups:
         t = g['type']
+        total = next((l.get('children', 0) for l in labels if l.get('top_id') == g['id']), 0)
         if t in ('raidz', 'draid'):
-            problems.append(('layout', t, f"top-level vdev {g['id']} is {t}, which is not supported (yet)",
-                             HINTS[t]))
+            problems.append(('layout', t, *refusal('raidz', id=g['id'], type=t)))
+            if total > len(g['devices']):
+                problems.append(('layout', f"{t}-degraded", *refusal('raidz-degraded', id=g['id'], have=len(g['devices']), total=total)))
         elif t not in SUPPORTED['top_level_types']:
-            problems.append(('layout', t, f"top-level vdev {g['id']} is of type '{t}', which is not supported",
-                             'Only single devices and mirrors (also several of them) are supported.'))
+            problems.append(('layout', t, *refusal('layout', id=g['id'], type=t)))
     missing = sorted(want - have)
     if missing:
         special = lab.get('active_features', {}).get('org.zfsonlinux:allocation_classes', 0) > 0
-        what = ('the pool uses allocation classes, so the missing vdev is probably a "special" vdev that holds '
-                'the metadata; without it nothing can be found by scanning the other devices. ' if special else
-                'if it was a "special" vdev (allocation classes) it held the metadata, and nothing can be '
-                'found by scanning the other devices. ')
-        problems.append(('devices', missing, f"top-level vdev(s) {missing} of {len(want)} have no device: {what}"
-                         "Otherwise the pool is incomplete, or the vdev was removed from it", HINTS['missing']))
+        sentence, hint = refusal('missing', missing=missing, want=len(want))
+        if special:
+            sentence += ' (the pool uses allocation classes: the missing vdev is probably a "special" vdev that holds the metadata)'
+        problems.append(('devices', missing, sentence, hint))
     for g in groups:
         total = next((l.get('children', 0) for l in labels if l.get('top_id') == g['id']), 0)
         if g['type'] == 'mirror' and total > len(g['devices']):
@@ -284,26 +229,23 @@ def check_compat(lab, labels, datasets, target, prof):
 
     feats = [f.split(':')[-1] for f in lab.get('features_for_read', [])]
     if (tgt0 or {}).get('encrypted'):
-        problems.append(('feature', 'encryption', 'the target dataset is natively encrypted; its files cannot be '
-                         'read without the key and decryption is not supported', HINTS['encryption']))
+        problems.append(('feature', 'encryption', *refusal('encryption')))
     elif 'encryption' in feats or any(d.get('encrypted') for d in datasets):
         warnings.append(('feature', 'encryption', 'the pool has natively encrypted datasets; that is only a '
-                         'problem if the dataset you want to recover is one of them', HINTS['encryption']))
+                         'problem if the dataset you want to recover is one of them', ''))
     if 'device_removal' in feats:
-        problems.append(('feature', 'device_removal', 'a device was removed from the pool', HINTS['removal']))
+        problems.append(('feature', 'device_removal', *refusal('removal')))
     if 'large_dnode' in feats or (tgt0 or {}).get('large_dnodes'):
         warnings.append(('feature', 'large_dnode', 'the pool uses large dnodes: file data, sizes and times are '
-                         'recovered, extended attributes stored in the extra dnode space may be missing', HINTS['large_dnode']))
+                         'recovered, extended attributes stored in the extra dnode space may be missing', ''))
 
     tgt = next((d for d in datasets if d['name'] == target), None)
     if tgt and tgt.get('readable'):
         c, k = tgt.get('compression'), tgt.get('checksum')
         if c and c not in SUPPORTED['compression']:
-            problems.append(('compression', c, f"the target dataset's data is compressed with {c}, which cannot "
-                             'be decompressed; its files would be unreadable', HINTS.get(c.split('-')[0], f'add {c}')))
+            problems.append(('compression', c, *refusal('compression', what=c)))
         if k and k not in SUPPORTED['checksum']:
-            problems.append(('checksum', k, f"the target dataset's data uses the {k} checksum, which cannot be "
-                             'verified', HINTS['checksum']))
+            problems.append(('checksum', k, *refusal('checksum', what=k)))
     elif target:
         warnings.append(('target', target, 'the target dataset could not be read, so its compression and '
                          'checksum are unknown; zstd/gzip-compressed or unverifiable data would show up as '
@@ -333,7 +275,7 @@ def main():
     ap.add_argument('--yes', action='store_true', help='accept defaults, no questions')
     ap.add_argument('--zdb-timeout', type=int, default=ZDB_TIMEOUT, help='seconds per zdb call (default %(default)s)')
     ap.add_argument('--zdb-budget', type=int, default=600,
-                    help='seconds in total for trying to open the pool at recent TXGs (default %(default)s)')
+                    help='seconds allowed for reading the datasets from the metadata (default %(default)s)')
     ap.add_argument('--force', action='store_true',
                     help='write the case file even if the pool has properties that are not supported (exit code 0)')
     a = ap.parse_args()
@@ -362,21 +304,26 @@ def main():
           f"top-level vdevs {lab['vdev_children']}, label txg {lab['txg']}")
 
     print('== 3. uberblock timeline')
-    ubs = read_uberblocks(a.zdb, devs)
+    ubs, rootbps = read_uberblocks(a.zdb, devs)
     if ubs:
         fmt = lambda t: time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(t))
         print(f'   {len(ubs)} uberblocks, txg {ubs[0][0]} ({fmt(ubs[0][1])} UTC) .. {ubs[-1][0]} ({fmt(ubs[-1][1])} UTC)')
 
-    print('== 4. opening the pool read-only at recent TXGs (zdb, no import)')
-    devdir = tempfile.mkdtemp(prefix='zfs-salvage-devs-')
-    for d in devs:
-        os.symlink(d, os.path.join(devdir, os.path.basename(d)))
-    txg, out, tried = try_open(a.zdb, devdir, pool, [t for t, _ in ubs], budget=a.zdb_budget)
-    datasets = parse_datasets(out) if txg else []
-    print(f'   opens at txg {txg}' if txg else f'   pool does not open at the {len(tried)} newest TXGs '
-          '(scanning the disk is still possible; profile will use defaults)')
+    print('== 4. reading the pool\'s datasets (walking the metadata ourselves, nothing is imported)')
+    newest = [rootbps[t] for t, _ in sorted(ubs, reverse=True) if t in rootbps][:40]
+    found = zsread_datasets(labels, pool, newest, a.zdb_budget) if newest else None
+    txg = None
+    if found and found.get('rootbp_index') is not None:
+        txg = sorted((t for t, _ in ubs if t in rootbps), reverse=True)[found['rootbp_index']]
+    datasets = found['datasets'] if txg else []
+    feats = found['features_for_write'] if txg else {}
+    for err in (found or {}).get('errors', []):
+        PROBLEMS.append(err)
+        print(f'   PROBLEM: {err}')
+    print(f'   metadata readable at txg {txg}' if txg else f'   no uberblock\'s metadata is readable ({len(newest)} tried; '
+          'scanning the disk is still possible; profile will use defaults)')
     unreadable = [d for d in datasets if not d['readable']]
-    readable = [d for d in datasets if d['readable'] and d.get('type') == 'ZPL' and '@' not in d['name']]
+    readable = [d for d in datasets if d['readable'] and d.get('type') == 'ZPL']
     for d in unreadable:
         print(f"   UNREADABLE {d['name']}: {d['error']}")
 
@@ -385,20 +332,20 @@ def main():
     sums = sorted({d['checksum'] for d in datasets if d.get('checksum')}) or ['unknown']
     prof = {'compression': comps, 'checksum': sums, 'label_start': 4 << 20,
             'ashift': lab['ashift'], 'encrypted': any(d.get('encrypted') for d in datasets)}
-    if readable and txg:
-        prof.update(meta_dnode_profile(a.zdb, devdir, pool, txg, readable[0]['name']))
+    if readable:
+        prof.update({'meta_dnode_levels': readable[0]['meta_dnode']['nlevels'],
+                     'indirect_block_size': readable[0]['meta_dnode']['indirect_block_size'],
+                     'dnode_block_size': readable[0]['meta_dnode']['dnode_block_size']})
     print(f'   {prof}')
 
     print('== 6. target dataset')
     default_target = a.target or (unreadable[0]['name'] if unreadable else (readable[0]['name'] if readable else pool))
     target = ask('Dataset to recover', default_target, a.yes)
     tgt = next((d for d in datasets if d['name'] == target and d.get('readable')), None)
-    if tgt and txg:                                  # compression/checksum/encryption of its objset block
-        tgt.update({k: v for k, v in dataset_header(a.zdb, devdir, pool, txg, target).items()
-                    if k in ('checksum', 'compression', 'encrypted', 'objset_birth')})
+    if tgt:                                          # only the target is checked for large dnodes (reads its whole meta-dnode)
+        again = zsread_datasets(labels, pool, newest[found['rootbp_index']:][:1], a.zdb_budget, large_dnodes=[target])
+        tgt['large_dnodes'] = next((d.get('large_dnodes') for d in (again or {}).get('datasets', []) if d['name'] == target), None)
         prof['encrypted'] = prof['encrypted'] or bool(tgt.get('encrypted'))
-        tgt['large_dnodes'] = has_large_dnodes(a.zdb, devdir, pool, txg, target)
-    feats = pool_features(a.zdb, devdir, pool, txg) if txg else {}
     lab['active_features'] = feats
     names = ask('Names you expect in its root directory (comma separated; optional, you can also pick the file system later from the ones found)',
                 a.root_names, a.yes)

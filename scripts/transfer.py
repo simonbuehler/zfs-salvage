@@ -22,6 +22,7 @@ import subprocess
 import threading
 import time
 
+import doctor
 from common import CATALOG, DB, HOST as RESCUE, reader_cmd, remote_argv
 
 TDIR = f'{CATALOG}/transfers'
@@ -154,19 +155,77 @@ _LINUX_PROBE = ('p={0}; while [ ! -e "$p" ]; do p=$(dirname "$p"); done; '
                 '[ -w "$p" ] && echo writable || echo readonly-dir')
 
 
-def _linux_check(host, path, where):
+def _pool_probe(devs):
+    """Shell lines that print the disk below the target's file system (TDISK) and below each pool device (PDISK)."""
+    return ('; dk() { lsblk -psnro NAME,TYPE "$1" 2>/dev/null | awk \'$2=="disk"{printf "%s ", $1}\'; }; '
+            'echo "TDISK $(dk "$(findmnt -no SOURCE -T "$p")")"; '
+            + ''.join(f'echo "PDISK {shlex.quote(d)} $(dk {shlex.quote(d)})"; ' for d in devs))
+
+
+def _linux_check(host, path, where, pool_devs=()):
     if not path.startswith('/'):
         return {'ok': False, 'info': 'use an absolute path (starting with /)'}
-    out = subprocess.run(remote_argv(_LINUX_PROBE.format(shlex.quote(path)), host, ('-o', 'ConnectTimeout=8')),
+    probe = _LINUX_PROBE.format(shlex.quote(path)) + (_pool_probe(pool_devs) if pool_devs else '')
+    out = subprocess.run(remote_argv(probe, host, ('-o', 'ConnectTimeout=8')),
                          capture_output=True, text=True, timeout=30).stdout.split('\n')
     free, fs, w = (out + ['', '', ''])[:3]
     fstype, opts = (fs.split() + ['', ''])[:2]
     if fstype in ('tmpfs', 'overlay'):
-        return {'ok': False, 'info': f'{path} is in RAM ({fstype}) – choose a real disk'}
+        return unsafe(f'{path} is in RAM ({fstype}) – choose a real disk')
     if 'ro' in opts.split(',') or w.strip() != 'writable':
-        return {'ok': False, 'info': f'{path} is read-only'}
+        return unsafe(f'{path} is read-only')
+    tdisks = {x for l in out if l.startswith('TDISK ') for x in l.split()[1:]}
+    for l in out:
+        parts = l.split()
+        shared = tdisks & set(parts[2:]) if parts[:1] == ['PDISK'] else set()
+        if shared:
+            return unsafe(f'{path}: {sorted(shared)[0]} also holds the pool ({parts[1]}): writing there could overwrite '
+                          'the very data you want to rescue – choose another disk')
     return {'ok': free.strip().isdigit(), 'free': int(free) if free.strip().isdigit() else None,
             'info': f'{where}: {path} ({fstype})'}
+
+
+def unsafe(info):
+    """A target the tool refuses on principle (RAM, read-only, the pool's own disk): `unsafe` makes start() refuse too."""
+    return {'ok': False, 'unsafe': True, 'info': info}
+
+
+def pool_disk_conflict(target_source):
+    """Message if the disk below the target's file system also holds a pool member, else None. Pool members that are
+    image files have no disk of their own."""
+    mine = set(doctor.disks_of(target_source)) if target_source else set()
+    if not mine:
+        return None
+    for dev in doctor.case_devices():
+        shared = mine & set(doctor.disks_of(dev))
+        if shared:
+            return (f'{sorted(shared)[0]} also holds the pool ({dev}): writing there could overwrite the very data you '
+                    'want to rescue – choose another disk')
+    return None
+
+
+def disk_warning(target_source):
+    """Warning if SMART says the target's disk is failing (rescued files would be at risk), else None."""
+    bad = []
+    for d in sorted(set(doctor.disks_of(target_source)) if target_source else ()):
+        problems, _ = doctor.smart_problems(d)
+        if problems:
+            bad.append(f'{d}: {", ".join(problems)}')
+    return ('this disk is failing – ' + '; '.join(bad) + ' – the rescued files may not survive there') if bad else None
+
+
+def check_local_target(path):
+    """Safety of a local target directory, judged by the mount that holds it (nearest existing parent `path`)."""
+    mp, fstype, source, opts = doctor.mount_info(path)
+    if fstype in doctor.RAM_DISK_FS and not os.environ.get('ZFS_SALVAGE_ALLOW_RAM_TARGET'):
+        return unsafe(f'{path} is in RAM ({fstype}) – the files would be gone after a reboot; choose a real disk')
+    if 'ro' in opts.split(','):
+        return unsafe(f'{path} is on a read-only file system')
+    conflict = pool_disk_conflict(source)
+    if conflict:
+        return unsafe(f'{path}: {conflict}')
+    warning = disk_warning(source)
+    return {'warning': warning} if warning else {}
 
 
 def check(t):
@@ -180,9 +239,12 @@ def check(t):
                 p = os.path.dirname(p)
             if not os.access(p, os.W_OK):
                 return {'ok': False, 'info': f'{p} is not writable'}
+            verdict = check_local_target(p)
+            if verdict.get('unsafe'):
+                return verdict
             st = os.statvfs(p)
             return {'ok': True, 'free': st.f_bavail * st.f_frsize, 'dest': d,
-                    'info': f'this computer: {d}' + ('' if p == d else ' (will be created)')}
+                    'info': f'this computer: {d}' + ('' if p == d else ' (will be created)'), **verdict}
         if t['type'] == 'ssh':
             host, path = split_ssh(d)
             if not is_windows(host):
@@ -195,7 +257,7 @@ def check(t):
             return {'ok': out.isdigit(), 'free': int(out) if out.isdigit() else None,
                     'info': f'{host} (Windows): {path}' if out.isdigit() else f'drive {path[0]}: not found on {host}'}
         if t['type'] == 'rescue':
-            return _linux_check(RESCUE, d, 'recovery host')
+            return _linux_check(RESCUE, d, 'recovery host', doctor.case_devices())
     except Exception as e:  # noqa: BLE001
         return {'ok': False, 'info': f'{type(e).__name__}: {e}'}
     return {'ok': False, 'info': 'unknown target type'}
@@ -457,6 +519,9 @@ JOBS = {}
 
 
 def start(target):
+    verdict = check(target)
+    if verdict.get('unsafe'):                 # the UI checks first, but the server does not rely on that
+        return {'state': 'refused', 'info': verdict['info']}
     j = Job(normalize(target))
     if j.id in JOBS and JOBS[j.id].status['state'] == 'running':
         return JOBS[j.id].status

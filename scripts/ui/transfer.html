@@ -101,7 +101,8 @@ async function check(){
   const need=sum?sum.sel_bytes:0, tight=r.free!=null&&r.free<need;
   el.innerHTML=!r.ok?`<span class="bad">✗ ${esc(r.info)}</span>`
     :`<span class="${tight?'bad':'ok'}">${tight?'✗':'✓'}</span> ${esc(r.info)}${r.dest&&r.dest!==t.dest?` <span class="mut">(${esc(r.dest)})</span>`:''} · `+
-     `<b>${r.free!=null?fmtB(r.free):'?'}</b> free · selection needs <b>${fmtB(need)}</b>`+(tight?' <b class="bad">– not enough space</b>':'');
+     `<b>${r.free!=null?fmtB(r.free):'?'}</b> free · selection needs <b>${fmtB(need)}</b>`+(tight?' <b class="bad">– not enough space</b>':'')+
+     (r.warning?`<div class="bad">⚠ ${esc(r.warning)}</div>`:'');
   if(r.ok)store.set('salvage.target',JSON.stringify({type,host:host(),path:$('path').value}));
   updateGo();
 }
