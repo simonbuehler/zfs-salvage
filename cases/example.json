@@ -22,6 +22,7 @@
   {"txg": 1200300, "time": 1714000000},
   {"txg": 1200310, "time": 1714000050}
  ],
+ "compatibility": [],
  "crash_txg": 1200310,
  "target": {
   "_comment": "you: the dataset to recover and names expected in its root directory",

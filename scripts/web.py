@@ -22,11 +22,11 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import status_page  # noqa: E402
 import transfer  # noqa: E402
-from common import CANDIDATES, DB, HOST, REPO, WORKFLOW, reader_cmd  # noqa: E402
+from common import CANDIDATES, DB, HOST, LOGS, REPO, STATUS, WORKFLOW, reader_cmd  # noqa: E402
 
 RULES = f'{REPO}/catalog/selection_rules.jsonl'
 UI = f'{REPO}/scripts/ui/index.html'
-STATUS_PAGE = f'{REPO}/status/index.html'
+STATUS_PAGE = f'{STATUS}/index.html'
 PORT = int(os.environ.get('SALVAGE_UI_PORT', 8765))
 
 
@@ -297,7 +297,8 @@ def status_loop():
         try:
             status_page.main()
         except Exception as e:  # noqa: BLE001 - the page must not take the server down
-            with open(f'{REPO}/logs/status_page.err', 'a') as f:
+            os.makedirs(LOGS, exist_ok=True)
+            with open(f'{LOGS}/status_page.err', 'a') as f:
                 f.write(time.strftime('%H:%M:%S ') + f'{type(e).__name__}: {e}\n')
         time.sleep(20)
 

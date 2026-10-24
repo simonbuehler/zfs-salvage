@@ -2,7 +2,7 @@
  * zscan – find ZFS metadata blocks on a block device (read-only).
  *
  * Recognises at every 512-byte position (lz4- or lzjb-compressed, or uncompressed):
- *   OBJSET  objset_phys_t of a ZPL dataset (meta-dnode type 10, os_type 2)
+ *   OBJSET  objset_phys_t of a ZPL dataset or a zvol (meta-dnode type 10, os_type 2 or 3; reported as os_type=)
  *   IND     indirect block of a dnode tree (128 block pointers of type 10)
  *   DNODES  dnode block (32 slots of dnode_phys_t)
  *
@@ -274,7 +274,7 @@ static size_t objset_lsize(const uint8_t *data, size_t have)
 	return have >= OBJSET_V3 && all_zero(data + 2560, OBJSET_V3 - 2560) ? OBJSET_V3 : OBJSET_V2;
 }
 
-/* OBJSET: meta-dnode type 10, nblkptr 3, os_type 2 at offset 704; data holds lsize bytes */
+/* OBJSET: meta-dnode type 10, nblkptr 3, os_type 2 (file system) or 3 (zvol) at offset 704; data holds lsize bytes */
 static int classify_objset(uint64_t off, const uint8_t *raw, const uint8_t *data, size_t lsize,
 			   size_t psize, int comp)
 {
@@ -285,11 +285,11 @@ static int classify_objset(uint64_t off, const uint8_t *raw, const uint8_t *data
 	if (!(data[0] == 10 && dnode_ok(data) && data[3] == 3)) return 0;
 	memcpy(&ost, data + 704, 8);
 	memcpy(&bp, data + 64, sizeof bp);
-	if (ost != 2 || !bp_ok(&bp, 10, -1)) return 0;
+	if ((ost != 2 && ost != 3) || !bp_ok(&bp, 10, -1)) return 0;
 	snprintf(det, sizeof det, "nlevels=%u\tbp_level=%u\tbp_birth=%" PRIu64
-		 "\tbp_dva0=%" PRIx64 "\tbp_fill=%" PRIu64,
+		 "\tbp_dva0=%" PRIx64 "\tbp_fill=%" PRIu64 "\tos_type=%u",
 		 data[2], (unsigned)BP_LEVEL(bp.w[6]), bp.w[10],
-		 (bp.w[1] & ~(UINT64_C(1) << 63)) << 9, bp.w[11]);
+		 (bp.w[1] & ~(UINT64_C(1) << 63)) << 9, bp.w[11], (unsigned)ost);
 	report(off, "OBJSET", comp, psize, lsize, raw, det);
 	return 1;
 }

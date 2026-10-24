@@ -44,6 +44,7 @@ LABEL_START = int(os.environ.get('ZSREAD_LABEL_START', 0x400000))
 DMU_OT_DNODE = 10
 DMU_OT_ZNODE = 17
 DMU_OT_SA = 44
+DMU_OT_ZVOL = 23
 
 
 class ReadError(Exception):
@@ -263,22 +264,37 @@ def read_embedded(bp):
     raise ReadError(f'embedded block pointer with compression {bp.comp} not supported')
 
 
+LIB_ERROR = None          # why the C library is not used (None = it is)
+
+
 def _load_lib():
     import ctypes
-    for p in (os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libzsalvage.so'),
-              '/usr/local/lib/libzsalvage.so'):
+    global LIB_ERROR
+    paths = (os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libzsalvage.so'),
+             '/usr/local/lib/libzsalvage.so')
+    LIB_ERROR = 'libzsalvage.so not found (looked next to zsread.py and in /usr/local/lib)'
+    for p in paths:
         if os.path.exists(p):
-            lib = ctypes.CDLL(p)
-            lib.zs_read_verify.argtypes = [ctypes.c_int, ctypes.c_uint64, ctypes.c_uint64,
-                                           ctypes.POINTER(ctypes.c_uint64), ctypes.c_int,
-                                           ctypes.c_char_p, ctypes.c_uint64]
-            lib.zs_fletcher4.argtypes = [ctypes.c_char_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint64)]
-            lib.zs_fletcher4.restype = None
+            try:
+                lib = ctypes.CDLL(p)
+            except OSError as e:
+                LIB_ERROR = f'{p} cannot be loaded: {e}'
+                continue
+            try:
+                lib.zs_read_verify.argtypes = [ctypes.c_int, ctypes.c_uint64, ctypes.c_uint64,
+                                               ctypes.POINTER(ctypes.c_uint64), ctypes.c_int,
+                                               ctypes.c_char_p, ctypes.c_uint64]
+                lib.zs_fletcher4.argtypes = [ctypes.c_char_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint64)]
+                lib.zs_fletcher4.restype = None
+            except AttributeError as e:                 # a library without the functions we need
+                LIB_ERROR = f'{p} does not have the expected functions: {e}'
+                continue
             for name in ('zs_lzjb', 'zs_lz4'):          # zs_lz4 is missing in builds from before lz4 support
                 f = getattr(lib, name, None)
                 if f is not None:
                     f.argtypes = [ctypes.c_char_p, ctypes.c_uint64, ctypes.c_char_p, ctypes.c_uint64]
                     f.restype = ctypes.c_int64
+            LIB_ERROR = None
             return lib, ctypes
     return None, None
 
@@ -424,6 +440,28 @@ class Dnode:
             bp = BP(data[128 * i:128 * (i + 1)])
         return None if bp.hole else bp
 
+    def data_blocks(self, dev, limit=None, bad=None):
+        """Ids of the data blocks that are not holes, ascending; whole hole subtrees are skipped without
+        looking at them. Unreadable indirect blocks are appended to `bad` as (first block, count) and skipped."""
+        epbs = self.indblkshift - 7
+        top = self.nlevels - 1
+        stack = [(bp, top, i << (epbs * top)) for i, bp in reversed(list(enumerate(self.bps)))]
+        while stack:
+            bp, lvl, base = stack.pop()
+            if bp.hole or (limit is not None and base >= limit):
+                continue
+            if lvl == 0:
+                yield base
+                continue
+            try:
+                data = read_bp(dev, bp)
+            except ReadError:
+                if bad is not None:
+                    bad.append((base, 1 << (epbs * lvl)))
+                continue
+            for i in reversed(range(len(data) // 128)):
+                stack.append((BP(data[128 * i:128 * (i + 1)]), lvl - 1, base + (i << (epbs * (lvl - 1)))))
+
     def read_block(self, dev, blkid):
         bp = self.l0_bp(dev, blkid)
         return bytes(self.blksz) if bp is None else read_bp(dev, bp)
@@ -432,9 +470,10 @@ class Dnode:
 class Objset:
     """A dataset, given by its meta-dnode (from an objset block or a tree root block)."""
 
-    def __init__(self, dev, meta):
+    def __init__(self, dev, meta, os_type=2):
         self.dev = dev
         self.meta = meta
+        self.os_type = os_type            # 2 = file system, 3 = zvol
         self.cache = {}
 
     def dnode(self, obj):
@@ -583,7 +622,8 @@ def open_candidate(dev, kind, off, comp, psize, lsize, vdev=0):
     disk = dev.first(vdev)
     data = read_raw_candidate(dev, off, comp, psize, lsize, disk)
     if kind == 'OBJSET':
-        return Objset(dev, meta_from_objset_block(data))
+        os_type = struct.unpack_from('<Q', data, 704)[0] if len(data) >= 712 else 2
+        return Objset(dev, meta_from_objset_block(data), os_type)
     if kind == 'IND':
         # synthetic block pointer to the tree root at this offset (checksum = its own fletcher4);
         # tree height and indirect block size follow from the block itself
@@ -595,7 +635,12 @@ def open_candidate(dev, kind, off, comp, psize, lsize, vdev=0):
         struct.pack_into('<Q', bp, 48, prop)
         struct.pack_into('<Q', bp, 80, 1)
         struct.pack_into('<4Q', bp, 96, *fletcher4(dev.pread(disk, off, psize)))
-        return Objset(dev, meta_from_root_block(bytes(bp), level + 1, lsize.bit_length() - 1))
+        os_ = Objset(dev, meta_from_root_block(bytes(bp), level + 1, lsize.bit_length() - 1))
+        try:                                    # no objset block: the type shows in object 1 (master node / volume)
+            os_.os_type = 3 if os_.dnode(ZVOL_DATA_OBJ).type == DMU_OT_ZVOL else 2
+        except ReadError:
+            pass
+        return os_
     raise SystemExit(f'unknown candidate kind {kind}')
 
 
@@ -635,6 +680,10 @@ def cmd_probe(args):
 def cmd_tree(args):
     dev = Dev()
     os_ = open_candidate(dev, *parse_candidate(args))
+    if os_.os_type == 3:                                    # a zvol is one file: the raw volume
+        print(f'/{VOLNAME}.raw\tf\t{zvol_size(os_)}\t{fmt_time(0)}\t{ZVOL_DATA_OBJ}\tok')
+        print(f'# zvol, 1 entry, read stats {dev.stats}', file=sys.stderr)
+        return
     z = ZPL(os_)
     stack = [('', z.root)]
     seen = set()
@@ -684,20 +733,25 @@ def cmd_batch(args):
         kind, comp, psize, lsize, birth = f[0], f[2], int(f[3]), int(f[4]), int(f[5])
         vdev, off = parse_offset(f[1])
         res = {'offset': f[1], 'kind': kind, 'birth': birth}
+        if LIB_ERROR:
+            res['lib'] = False
         signal.alarm(30)
         t0 = time.time()
         try:
             os_ = open_candidate(dev, kind, off, comp, psize, lsize, vdev)
-            if kind == 'IND':
-                data = read_raw_candidate(dev, off, comp, psize, lsize, dev.first(vdev))
-                res['objects'] = sum(BP(data[128 * i:128 * (i + 1)]).fill for i in range(len(data) // 128))
+            if os_.os_type == 3:                         # a zvol: no directories, one volume
+                res.update(type='zvol', volsize=zvol_size(os_), objects=os_.meta.bps[0].fill, root=[], n_root=0, ok=True)
             else:
-                res['objects'] = os_.meta.bps[0].fill
-            z = ZPL(os_)
-            names = sorted(z.listdir(z.root).keys())
-            res['root'] = names[:500]       # the target is recognised by these names
-            res['n_root'] = len(names)
-            res['ok'] = True
+                if kind == 'IND':
+                    data = read_raw_candidate(dev, off, comp, psize, lsize, dev.first(vdev))
+                    res['objects'] = sum(BP(data[128 * i:128 * (i + 1)]).fill for i in range(len(data) // 128))
+                else:
+                    res['objects'] = os_.meta.bps[0].fill
+                z = ZPL(os_)
+                names = sorted(z.listdir(z.root).keys())
+                res['root'] = names[:500]       # the target is recognised by these names
+                res['n_root'] = len(names)
+                res['ok'] = True
         except Timeout:
             res.update(ok=False, error='timeout')
         except Exception as e:  # noqa: BLE001 - every failure is a finding
@@ -739,6 +793,111 @@ class FileStream:
         return out
 
 
+ZVOL_DATA_OBJ, ZVOL_PROP_OBJ = 1, 2             # a zvol objset: object 1 holds the volume, object 2 its properties
+VOLNAME = os.environ.get('ZSREAD_VOLNAME', 'volume')    # name of the .raw file (the dataset's last path component)
+
+
+def zvol_size(os_):
+    """Volume size in bytes: the `size` property (ZAP object 2); the allocated range if that cannot be read."""
+    try:
+        v = zap_read(os_, ZVOL_PROP_OBJ).get('size')
+    except ReadError:
+        v = None
+    if not isinstance(v, int):
+        dn = os_.dnode(ZVOL_DATA_OBJ)
+        v = (dn.maxblkid + 1) * dn.blksz
+    return v
+
+
+class ZvolStream:
+    """The data of a zvol as a file object: blocks verified one by one, unreadable ones replaced by zeros
+    and listed in `bad`. `sha` is the SHA-256 of the full logical image (holes count as zeros).
+    If the volume has holes, the stream is a PAX GNU sparse 1.0 member (`member_size` bytes: a map of the
+    data runs, padded to 512, then only the data of the blocks that exist), so holes stay holes on the
+    target; a volume without holes is a plain file. GNU tar and bsdtar (libarchive) extract both."""
+
+    def __init__(self, os_, dn, size):
+        import hashlib
+        self.os, self.dn, self.size = os_, dn, size
+        bsz = dn.blksz
+        self.nblk = (size + bsz - 1) // bsz
+        self.bad, spans, runs = [], [], []
+        for blk in dn.data_blocks(os_.dev, self.nblk, spans):
+            if runs and runs[-1][0] + runs[-1][1] == blk:
+                runs[-1][1] += 1
+            else:
+                runs.append([blk, 1])
+        self.bad += [b for b, _ in spans]                     # first block of every span that could not be listed
+        self.runs = [(s, c) for s, c in runs]
+        self.header = b''
+        self.sparse = self.runs != [(0, self.nblk)]
+        if self.sparse:
+            lens = [(s * bsz, min(c * bsz, size - s * bsz)) for s, c in self.runs]
+            if not lens or lens[-1][0] + lens[-1][1] < size:
+                lens.append((size, 0))                        # closing entry: tar extends the file to its real size
+            m = f'{len(lens)}\n' + ''.join(f'{o}\n{n}\n' for o, n in lens)
+            self.header = m.encode().ljust((len(m) + 511) // 512 * 512, b'\0')
+            self.member_size = len(self.header) + sum(n for _, n in lens)
+        else:
+            self.member_size = size
+        self.sha = hashlib.sha256()
+        self.buf = b''
+        self._gen = self._chunks()
+
+    def _zeros(self, n):
+        while n > 0:
+            m = min(n, 1 << 20)
+            self.sha.update(bytes(m))
+            n -= m
+
+    def _chunks(self):
+        if self.header:
+            yield self.header
+        bsz, pos = self.dn.blksz, 0
+        for s, c in self.runs if self.sparse else [(0, self.nblk)]:
+            self._zeros(s * bsz - pos)                        # hole before this run: hashed, not stored
+            for blk in range(s, s + c):
+                try:
+                    data = self.dn.read_block(self.os.dev, blk)
+                except ReadError:
+                    self.bad.append(blk)
+                    data = bytes(bsz)
+                data = data[:self.size - blk * bsz]
+                self.sha.update(data)
+                yield data
+            pos = (s + c) * bsz
+        self._zeros(self.size - pos)
+
+    def finish(self):
+        """Run the generator to its end. tarfile reads exactly member_size bytes and stops, which is before
+        the zeros of a hole at the end of the volume are hashed; call this before using `sha`."""
+        for _ in self._gen:
+            pass
+
+    def read(self, n=-1):
+        while n < 0 or len(self.buf) < n:
+            try:
+                self.buf += next(self._gen)
+            except StopIteration:
+                break
+        if n < 0:
+            n = len(self.buf)
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+
+def zvol_tarinfo(path, vs):
+    """Tar header of a volume stream: a plain file, or a PAX GNU sparse 1.0 member if the volume has holes."""
+    import tarfile
+    ti = tarfile.TarInfo(path.lstrip('/'))
+    ti.mode, ti.size = 0o600, vs.member_size
+    if vs.sparse:
+        ti.pax_headers = {'GNU.sparse.major': '1', 'GNU.sparse.minor': '0',
+                          'GNU.sparse.name': path.lstrip('/'), 'GNU.sparse.realsize': str(vs.size)}
+        ti.name = 'GNUSparseFile.0/' + os.path.basename(path)
+    return ti
+
+
 def cmd_extract(args):
     """stdin: 'obj<TAB>path' lines. stdout: tar stream.
     stderr: manifest lines 'M<TAB>status<TAB>path<TAB>size<TAB>sha256<TAB>bad_blocks',
@@ -747,13 +906,29 @@ def cmd_extract(args):
     import tarfile
     dev = Dev()
     os_ = open_candidate(dev, *parse_candidate(args))
-    z = ZPL(os_)
+    zvol = os_.os_type == 3
+    z = None if zvol else ZPL(os_)
     tar = tarfile.open(fileobj=sys.stdout.buffer, mode='w|', format=tarfile.PAX_FORMAT)
     for line in sys.stdin:
         line = line.rstrip('\n')
         if not line:
             continue
         obj, path = line.split('\t', 1)
+        if zvol:
+            try:
+                if int(obj) != ZVOL_DATA_OBJ:
+                    raise ReadError('a zvol has only one object to extract: the volume (object 1)')
+                size = zvol_size(os_)
+                vs = ZvolStream(os_, os_.dnode(ZVOL_DATA_OBJ), size)
+            except ReadError as e:
+                print(f'M\tDNODE_ERROR\t{path}\t0\t-\t{e}', file=sys.stderr, flush=True)
+                continue
+            tar.addfile(zvol_tarinfo(path, vs), vs)
+            vs.finish()
+            bad = ','.join(map(str, vs.bad[:50])) or '-'
+            print(f'M\t{"OK" if not vs.bad else "PARTIAL"}\t{path}\t{size}\t{vs.sha.hexdigest()}\t{bad}',
+                  file=sys.stderr, flush=True)
+            continue
         try:
             dn = os_.dnode(int(obj))
             a = z.attrs(dn)
@@ -787,6 +962,9 @@ def cmd_extract(args):
 
 
 if __name__ == '__main__':
+    if LIB_ERROR:
+        print(f'zsread: SLOW MODE - {LIB_ERROR}; using the pure-Python fallback (works, but much slower). '
+              'Install it with scripts/deploy-tools.sh.', file=sys.stderr, flush=True)
     cmds = {'probe': cmd_probe, 'tree': cmd_tree, 'batch': cmd_batch, 'extract': cmd_extract}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__)

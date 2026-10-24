@@ -38,7 +38,14 @@ echo "${VDEV:-0}" > "$OUT/vdev"                 # rank-trees.py prefixes this vd
 for s in ${ZFS_SALVAGE_IND_SIZES:-}; do MAXOPT="$MAXOPT --ind-size $s"; done
 echo "max txg: ${MAXTXG:-none}, top-level vdev ${VDEV:-0} of 0..${MAXVDEV:-0}, indirect block sizes: ${ZFS_SALVAGE_IND_SIZES:-128K and 16K}"
 
-[ "$(ssh "$HOST" "blockdev --getro $DEV")" = 1 ] || { echo "$DEV is not read-only on $HOST – refusing to scan"; exit 1; }
+# pre-flight: every failure is one clear ERROR line (the status page shows the last one)
+fail() { echo "ERROR: $*"; exit 1; }
+err="$(ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" true 2>&1)" || fail "cannot reach $HOST over ssh: $(echo "$err" | head -1)"
+ssh "$HOST" 'command -v zscan >/dev/null' || fail "zscan is not installed on $HOST – run scripts/deploy-tools.sh"
+ssh "$HOST" "zscan --max-vdev 0 /dev/null 2>&1 | grep -qE 'unknown or incomplete option|No such file'" \
+    && fail "zscan on $HOST is too old (no --max-vdev) – run scripts/deploy-tools.sh"
+[ "$(ssh "$HOST" "blockdev --getro $DEV")" = 1 ] || fail "$DEV does not exist or is not read-only on $HOST – refusing to scan"
+
 SIZE=$(ssh "$HOST" "blockdev --getsize64 $DEV")
 STEP=$((CHUNK_GIB << 30))
 N=$(( (SIZE + STEP - 1) / STEP ))

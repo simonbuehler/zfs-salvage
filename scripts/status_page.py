@@ -16,12 +16,12 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (CANDIDATES, CASE, DB, PROBE_STATS, RAW, REPO, SCAN_DEVICE, SCAN_LOG, STATUS as OUT,
-                    TARGET, TARGET_NAME, WORKFLOW, ssh)
+from common import (CANDIDATES, CASE, DB, HOST, LOGS, PROBE_STATS, RAW, SCAN_DEVICE, SCAN_LOG, STATUS as OUT,
+                    TARGET, TARGET_NAME, WORKFLOW, profile, ssh, ssh_error)
 
 SMART_CACHE = f'{OUT}/.smart.json'
 LOG = SCAN_LOG
-L6_LEVEL = CASE.get('profile', {}).get('meta_dnode_levels', 7) - 2
+L6_LEVEL = (profile().get('meta_dnode_levels') or 7) - 2
 
 
 def num(x):
@@ -222,6 +222,7 @@ def main():
     eta = (n - len(done) - cur_frac) * avg if avg else None
     temps = ', '.join(f'{d}: {t} °C' for d, t in sorted(smart().get('temp', {}).items())) or '–'
 
+    host_error = ssh_error()
     cands = []
     try:
         cands = json.load(open(CANDIDATES))
@@ -233,6 +234,17 @@ def main():
     except Exception:
         pass
     byds = pstats.get('by_dataset', {})
+    host_error = host_error or pstats.get('host_error')
+    alerts = []                                       # (severity, text): problems the user must see
+    if host_error:
+        alerts.append(('error', f'Recovery host {HOST} is unreachable: {host_error} '
+                       '(set ZFS_SALVAGE_HOST, check the SSH key and that the host is running)'))
+    scan_err = [l for l in log.splitlines()[-3:] if l.startswith('ERROR:')]
+    if scan_err:
+        alerts.append(('error', 'Scan: ' + scan_err[-1][6:].strip()))
+    if pstats.get('slow_mode'):
+        alerts.append(('warn', 'Slow mode: the C library is not used on the recovery host, reading falls back to '
+                       'pure Python. ' + (pstats.get('slow_reason') or '').replace('zsread: SLOW MODE - ', '')))
     probe_txt = (f'{num(pstats.get("probed", 0))} candidates verified, {num(pstats.get("pending", 0))} pending'
                  + (f', {num(pstats["deferred"])} older ones deferred until the scan is done' if pstats.get('deferred') else '')
                  + ' · ' + ' · '.join(f'{k}: {num(v)}' for k, v in sorted(byds.items(), key=lambda kv: -kv[1])))
@@ -272,7 +284,10 @@ def main():
             f'<div>Distance to goal<b>{gap_txt}</b></div><div>Readable states<b>{num(byds.get(TARGET_NAME, 0))}</b></div></div>'
             f'<div>{action} <span id="cj" class="mut"></span></div></div>')
     scanning = cur_idx >= 0 or len(done) < n
-    json.dump({'scan': {'running': cur_idx >= 0, 'pct': 100 * frac, 'eta': eta},
+    banner = ''.join(f'<div class="alert {sev}"><b>{"✗" if sev == "error" else "!"}</b> {html.escape(text)}</div>'
+                     for sev, text in alerts)
+    hero = banner + hero
+    json.dump({'alerts': [t for _, t in alerts], 'scan': {'running': cur_idx >= 0, 'pct': 100 * frac, 'eta': eta},
                'newest': {'txg': newest, 'label': txg_label(newest) if newest else None,
                           'date': txg_date(newest) if newest else None,
                           'objects': best.get('objects')}, 'goal': goal},
@@ -283,7 +298,8 @@ def main():
     line = (f'{now}  {100 * frac:5.1f} %  chunks {len(done)}/{n}  OBJSET {totals["OBJSET"]}  L6 {totals["L6"]}  '
             f'IND {totals["IND"]}  DNODES {totals["DNODES"]}  ETA {eta / 3600:.1f} h  {temps}' if eta else
             f'{now}  {100 * frac:5.1f} %  {cur_txt}  {temps}')
-    with open(f'{REPO}/logs/status.log', 'a') as f:
+    os.makedirs(LOGS, exist_ok=True)
+    with open(f'{LOGS}/status.log', 'a') as f:
         f.write(line + '\n')
 
     ds = html.escape(TARGET.get('dataset', 'target'))
@@ -307,8 +323,8 @@ def main():
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>zfs-salvage status</title>
 <style>
-:root{{--bg:#f7f7f5;--fg:#1d1d1b;--mut:#6b6b66;--card:#fff;--line:#e2e2dc;--acc:#2f6f4f;--bar:#d9e8df}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#151614;--fg:#e8e8e3;--mut:#9a9a93;--card:#1e1f1c;--line:#33342f;--acc:#7fc29b;--bar:#26372d}}}}
+:root{{--bg:#f7f7f5;--fg:#1d1d1b;--mut:#6b6b66;--card:#fff;--line:#e2e2dc;--acc:#2f6f4f;--bar:#d9e8df;--bad:#d03b3b}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#151614;--fg:#e8e8e3;--mut:#9a9a93;--card:#1e1f1c;--line:#33342f;--acc:#7fc29b;--bar:#26372d;--bad:#e66767}}}}
 body{{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}}
 main{{max-width:960px;margin:0 auto;padding:16px}} a{{color:var(--acc)}}
 h1{{font-size:20px;margin:0 0 2px}} .mut{{color:var(--mut);font-size:13px}}
@@ -330,6 +346,8 @@ details.card>summary{{cursor:pointer;font-weight:600}} details summary{{cursor:p
 table{{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}}
 td,th{{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}} .wrap{{overflow-x:auto}}
 h3{{font-size:14px;margin:14px 0 6px}}
+.alert{{border:1px solid var(--bad);border-left-width:5px;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:14px}}
+.alert.warn{{border-color:#fab219}} .alert b{{margin-right:4px}}
 </style></head><body><main>
 <nav id="steps" data-page="status"></nav>
 <h1>zfs-salvage · {ds}</h1>

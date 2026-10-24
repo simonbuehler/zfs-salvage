@@ -226,11 +226,18 @@ def make(variant, cfg):
         sh('zfs', 'create', '-s', '-V', '64M', f'{pool}/vol')    # sparse: no reservation in the small pool
         sh('udevadm', 'settle')
         rnd = random.Random(7)
-        data = b''.join((bytes([k % 251]) * 4096 if k % 8 else rnd.randbytes(4096))
-                        for k in range(64 << 20 >> 12))
-        with open(f'/dev/zvol/{pool}/vol', 'wb') as f:
-            f.write(data)
-        side['zvol'] = {'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+        total, hole = 64 << 20, (8 << 20, 48 << 20)               # [8 MiB, 48 MiB) is never written: a hole
+        data = bytearray()
+        for k in range(total >> 12):
+            data += bytes(4096) if hole[0] <= k * 4096 < hole[1] else (
+                bytes([k % 251 + 1]) * 4096 if k % 8 else rnd.randbytes(4096))
+        with open(f'/dev/zvol/{pool}/vol', 'r+b') as f:           # write the two ends only, like a thin VM disk
+            f.write(bytes(data[:hole[0]]))
+            f.seek(hole[1])
+            f.write(bytes(data[hole[1]:]))
+        sh('sync')
+        side['zvol'] = {'size': len(data), 'sha256': hashlib.sha256(bytes(data)).hexdigest(),
+                        'holes': [[hole[0], hole[1] - hole[0]]], 'volblocksize': 16384}
     if target == 'home':
         if not cfg.get('encrypt'):
             sh('zfs', 'create', f'{pool}/home')

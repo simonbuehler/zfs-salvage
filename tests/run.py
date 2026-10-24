@@ -39,7 +39,6 @@ _spec.loader.exec_module(rank_trees)
 # <variant>-damaged. An entry that passes is reported as XPASS and counts as a failure, so the
 # table has to be updated in the same commit that fixes the behaviour.
 XFAIL = {
-    'modern-zvol': ('planned', 'zvol export'),
     'modern-offset': ('planned', 'pool does not start at offset 0 of the file'),
     'raidz1-4': ('planned', 'raidz is not supported'),
     'raidz2-5': ('planned', 'raidz is not supported'),
@@ -131,8 +130,6 @@ def expected_files(side):
 
 def pipeline(base, damaged, zsdir, verbose, derived=None):
     side = fx.sidecars()[base]
-    if 'files' not in side:
-        raise Fail('no ZPL files to compare (zvol fixture, needs zvol support)')
     work = fx.tmpdir()
     try:
         devs = fx.unpack(base, work)
@@ -168,6 +165,8 @@ def pipeline(base, damaged, zsdir, verbose, derived=None):
         if not okay:
             errs = sorted({r.get('error', '?')[:80] for r in results})[:3]
             raise Fail(f'{len(cands)} candidates, none readable ({"; ".join(errs) or err.strip()[-120:]})')
+        if 'zvol' in side:
+            return zvol_pipeline(side, work, zsdir, vdevs, label, cands, okay, verbose)
         names = {f['path'].split('/')[1] for f in expected_files(side)}
         mine = [r for r in okay if names & set(r['root'])]
         if not mine:
@@ -228,6 +227,45 @@ def pipeline(base, damaged, zsdir, verbose, derived=None):
         return f'files={len(want)}/{len(want)}'
     finally:
         fx.rmtree(work)
+
+
+def zvol_pipeline(side, work, zsdir, vdevs, label, cands, okay, verbose):
+    """A zvol fixture: the newest verified volume state must extract to the image the generator wrote."""
+    want = side['zvol']
+    mine = [r for r in okay if r.get('type') == 'zvol' and r.get('volsize') == want['size']]
+    if not mine:
+        raise Fail(f'{len(okay)} readable trees, none is a zvol of {want["size"]} bytes; '
+                   f'zvols seen: {sorted({r.get("volsize") for r in okay if r.get("type") == "zvol"})}')
+    best = max(mine, key=lambda r: r['birth'])
+    cand = next(c for c in cands if c[1] == best['offset'])
+    carg = list(cand[:5])
+    log(verbose, f'zvol state {best["kind"]} birth {best["birth"]} @{best["offset"]}')
+    rc, out, err = zsread(zsdir, ['tree', *carg], vdevs, label)
+    lines = [l.split('\t') for l in out.decode().splitlines() if '\t' in l]
+    if len(lines) != 1 or lines[0][0] != '/volume.raw' or lines[0][2] != str(want['size']):
+        raise Fail(f'tree of a zvol should be one entry /volume.raw of {want["size"]} bytes, got {lines[:3]}')
+    rc, tar_bytes, err = zsread(zsdir, ['extract', *carg], vdevs, label, f'{lines[0][4]}\t{lines[0][0]}\n'.encode())
+    tar_path = os.path.join(work, 'zvol.tar')
+    with open(tar_path, 'wb') as f:
+        f.write(tar_bytes)
+    manifest = [l.split('\t') for l in err.splitlines() if l.startswith('M\t')]
+    import hashlib
+    with tarfile.open(tar_path) as tf:
+        members = tf.getmembers()
+        if len(members) != 1:
+            raise Fail(f'extract gave {len(members)} tar members')
+        h = hashlib.sha256()
+        src = tf.extractfile(members[0])
+        for b in iter(lambda: src.read(1 << 20), b''):
+            h.update(b)
+        name, size = members[0].name, members[0].size
+    if (name, size) != ('volume.raw', want['size']):
+        raise Fail(f'tar member {name!r} of {size} bytes, expected volume.raw of {want["size"]}')
+    if h.hexdigest() != want['sha256']:
+        raise Fail(f'volume content differs (sha256 {h.hexdigest()[:12]} != {want["sha256"][:12]})')
+    if not manifest or manifest[0][1] != 'OK' or manifest[0][4] != want['sha256']:
+        raise Fail(f'manifest line does not report the same image: {manifest}')
+    return f'volume={want["size"]} bytes, sha256 ok, holes {want.get("holes")}'
 
 
 def plan(names):

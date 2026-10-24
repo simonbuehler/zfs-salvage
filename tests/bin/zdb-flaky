@@ -1,0 +1,9 @@
+#!/bin/bash
+# A zdb that only answers the label calls (-l, -lu) and fails on everything else, like zdb 2.2 on a damaged pool.
+#   FLAKY=hang   the other calls do not return
+#   FLAKY=abort  the other calls abort with an assertion (SIGABRT), as zdb does on a broken deadlist
+case "$1" in -l|-lu) exec zdb "$@" ;; esac
+case "${FLAKY:-abort}" in
+  hang) sleep 3600 ;;
+  abort) echo "zdb: ../../module/zfs/dsl_deadlist.c:103: Assertion '0 == dmu_bonus_hold' failed." >&2; kill -ABRT $$ ;;
+esac

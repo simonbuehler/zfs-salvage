@@ -14,7 +14,14 @@
  "label_start": 4194304,
  "zvol": {
   "size": 67108864,
-  "sha256": "83e9973e981fb30f630545ac88c3a61d9390293e590a1543e5ba66f3e929a97f"
+  "sha256": "1153412636cf53d7a3e9a78f9861ac31fb14c4ccfe660d30d9a525a5c1239f12",
+  "holes": [
+   [
+    8388608,
+    41943040
+   ]
+  ],
+  "volblocksize": 16384
  },
  "features": {
   "feature@async_destroy": "enabled",
@@ -61,30 +68,30 @@
   "mos": {
    "type": "META",
    "id": 0,
-   "objects": 56,
-   "size": "348K"
+   "objects": 54,
+   "size": "312K"
   },
   "fx-modern-zvol/vol": {
    "type": "ZVOL",
-   "id": 261,
+   "id": 260,
    "objects": 2,
-   "size": "16.4M",
-   "rootbp": "DVA[0]=<0:5660000:1000> DVA[1]=<0:1505000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=69L/69P fill=2 cksum=0000000611451342:000015e8c0556419:0027c073f0354d21:3051a3b0873a9b63",
+   "size": "6.19M",
+   "rootbp": "DVA[0]=<0:302f000:1000> DVA[1]=<0:11d5000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=28L/28P fill=2 cksum=000000053c7f7209:000012e6bfaf107d:0022485b6632739c:29a84a1f06e467eb",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 90570752,
+     "offset": 50524160,
      "asize": 4096
     },
     {
      "vdev": 0,
-     "offset": 22040576,
+     "offset": 18698240,
      "asize": 4096
     }
    ],
    "lsize": 4096,
    "psize": 4096,
-   "birth": 69,
+   "birth": 28,
    "objset_block": "fletcher4 uncompressed unencrypted"
   },
   "fx-modern-zvol": {
@@ -94,7 +101,7 @@
    "size": "96K"
   }
  },
- "newest_txg": 86,
+ "newest_txg": 45,
  "target": "fx-modern-zvol/vol",
  "meta_dnode": {
   "nlevels": 6,
@@ -102,25 +109,25 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:5652000:1000 20000L/1000P F=2 B=68/68 cksum=000000895e484c79:0001fa4c4723f3e8:03a7b805eac26255:8436261e56a09dc7",
-  "0  L4     0:5651000:1000 20000L/1000P F=2 B=68/68 cksum=0000008846659065:0001f5fed89c35a8:039f3ea445c8ac6a:7912c6ba4d6184ec",
-  "0   L3    0:5650000:1000 20000L/1000P F=2 B=68/68 cksum=0000008792693292:0001f33a3f91ade6:0399ca5ea40dad41:71e6b6f86998db67",
-  "0    L2   0:564f000:1000 20000L/1000P F=2 B=68/68 cksum=00000087f34c8374:0001f4b5b7555c3d:039cb22f362827a7:75b3a29007a9b938",
-  "0     L1  0:564e000:1000 20000L/1000P F=2 B=68/68 cksum=000000854050d120:0001ea09a47b55fc:038793935ffb6da7:59cf8cbbabf64d55",
-  "0      L0 0:564d000:1000 4000L/1000P F=2 B=68/68 cksum=0000001b3b492d04:00006885f0854b09:00c8de241657e74d:01b1c25116c32ebb"
+  "0 L5      0:3022000:1000 20000L/1000P F=2 B=27/27 cksum=000000862aac846c:0001edf09ef64b44:038fc50c4b39440b:6526f5ba802b244c",
+  "0  L4     0:3021000:1000 20000L/1000P F=2 B=27/27 cksum=00000084b9045716:0001e8381f018a4e:03846d065ff96d38:5623f81fd1c6c2b2",
+  "0   L3    0:3020000:1000 20000L/1000P F=2 B=27/27 cksum=000000863260c989:0001edbdc02a04b1:038ed618d38928e9:634e9bc49c35b97f",
+  "0    L2   0:301f000:1000 20000L/1000P F=2 B=27/27 cksum=0000008855a89272:0001f629a8b10c8b:039f70b7859d2c47:792736ace1f883a2",
+  "0     L1  0:301e000:1000 20000L/1000P F=2 B=27/27 cksum=0000008522fbd138:0001e988c3fef9ee:03867b03fd338f7c:583b5aa76bb0fdf2",
+  "0      L0 0:301d000:1000 4000L/1000P F=2 B=27/27 cksum=0000001aa68c8ce2:00006668d9fc9f93:00c50809595bb5d5:fd1076c212ac0610"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 94765056,
+    "offset": 54718464,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 26234880,
+    "offset": 22892544,
     "length": 4096,
     "seed": 1001
    }
@@ -128,7 +135,7 @@
   "zdb_error": "failed to hold dataset 'fx-modern-zvol/vol': Input/output error | [exit 2]failed to hold dataset 'fx-modern-zvol/vol': Input/output error | zdb: can't open 'fx-modern-zvol/vol': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "f781f010b4b8c314ebb974ac435896a3e847e803c7463e49f5f6eabc1a55a3ef"
+  "d0.img": "5efaa16f260574ad1820f26b9c872db3070703d14731ab869ed6af38380a6f40"
  },
- "seconds": 13.4
+ "seconds": 11.1
 }

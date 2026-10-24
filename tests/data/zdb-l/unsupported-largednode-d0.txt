@@ -1,0 +1,30 @@
+------------------------------------
+LABEL 0 
+------------------------------------
+    version: 5000
+    name: 'fx-unsupported-largednode'
+    state: 1
+    txg: 57
+    pool_guid: 7908928069158552910
+    errata: 0
+    hostid: 206356055
+    hostname: 'ubuntu'
+    top_guid: 2514872959972474132
+    guid: 2514872959972474132
+    vdev_children: 1
+    vdev_tree:
+        type: 'file'
+        id: 0
+        guid: 2514872959972474132
+        path: '/var/tmp/zfs-salvage-fixtures/unsupported-largednode/d0.img'
+        metaslab_array: 128
+        metaslab_shift: 24
+        ashift: 12
+        asize: 129499136
+        is_log: 0
+        create_txg: 4
+    features_for_read:
+        com.delphix:hole_birth
+        com.delphix:embedded_data
+        com.klarasystems:vdev_zaps_v2
+    labels = 0 1 2 3 

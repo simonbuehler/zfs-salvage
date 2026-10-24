@@ -10,16 +10,21 @@ import os
 import re
 import shlex
 import subprocess
+import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOST = os.environ.get('ZFS_SALVAGE_HOST', 'recovery-host')
-READER = '/usr/local/bin/zsread.py'          # installed by scripts/deploy-tools.sh
+READER = os.environ.get('ZFS_SALVAGE_READER') or '/usr/local/bin/zsread.py'    # installed by scripts/deploy-tools.sh
 
-STATUS = f'{REPO}/status'
+# runtime state (status page files, run logs) lives below ZFS_SALVAGE_STATE_DIR, default: the repository
+STATE = os.environ.get('ZFS_SALVAGE_STATE_DIR') or REPO
+STATUS = f'{STATE}/status'
+LOGS = f'{STATE}/logs'
 CANDIDATES = f'{STATUS}/target_candidates.json'
 PROBED = f'{STATUS}/probed.jsonl'
 PROBE_STATS = f'{STATUS}/probe_stats.json'
 WORKFLOW = f'{STATUS}/workflow.json'
+TREE_PROFILE = f'{STATUS}/tree_profile.json'     # facts measured on a verified tree (rank-trees.py)
 DB = f'{REPO}/catalog/catalog.sqlite'
 
 
@@ -40,6 +45,18 @@ RAWS = [f'{REPO}/{d}' for d in _scan.get('chunk_dirs', [])] or [RAW]
 SCAN_LOG = f"{REPO}/{_scan.get('log') or 'logs/scan.log'}"
 
 
+def profile():
+    """The pool profile: the case's, overridden by what was measured on a verified tree. The case is
+    written before the scan, and zdb may not tell the metadata layout at all (pool does not open)."""
+    p = dict(CASE.get('profile', {}))
+    try:
+        with open(TREE_PROFILE) as f:
+            p.update(json.load(f))
+    except (OSError, ValueError):
+        pass
+    return p
+
+
 def newest_txg():
     """Newest TXG in the case's uberblock timeline (0 if the case has none)."""
     return max((e['txg'] for e in CASE.get('timeline', [])), default=0)
@@ -58,19 +75,39 @@ def reader_cmd(*args):
     else:
         devs = ':'.join(d['path'] for d in devices)
         env = f'ZSREAD_DEVS={shlex.quote(devs)} ' if devs else ''
+    if TARGET.get('type') == 'zvol':                         # the .raw file is named after the volume
+        env += f"ZSREAD_VOLNAME={shlex.quote(TARGET_NAME.rsplit('/', 1)[-1])} "
     label = CASE.get('profile', {}).get('label_start')
     if label:
         env += f'ZSREAD_LABEL_START={int(label)} '
     return f'{env}python3 -I {READER} ' + ' '.join(args)
 
 
+SSH_STATE = {'error': None, 'time': 0.0}      # outcome of the most recent ssh() call
+
+
+def ssh_error():
+    """Why the last ssh() call could not reach the recovery host (first line of ssh's message), or None."""
+    return SSH_STATE['error']
+
+
 def ssh(cmd, timeout=20, **kw):
-    """Run a command on the recovery host; returns stdout ('' on failure)."""
+    """Run a command on the recovery host; returns stdout ('' on failure). Whether the host could be
+    reached at all is available from ssh_error(): ssh itself fails with exit status 255, any other status
+    is the remote command's own."""
+    err = None
     try:
-        return subprocess.run(['ssh', '-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes', HOST, cmd],
-                              capture_output=True, text=True, timeout=timeout, **kw).stdout
-    except (subprocess.TimeoutExpired, OSError):
-        return ''
+        r = subprocess.run(['ssh', '-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes', HOST, cmd],
+                           capture_output=True, text=True, timeout=timeout, **kw)
+        if r.returncode == 255:
+            err = next((l.strip() for l in r.stderr.splitlines() if l.strip()), 'ssh failed (exit status 255)')
+        out = r.stdout
+    except subprocess.TimeoutExpired:
+        err, out = f'no answer from {HOST} within {timeout} s', ''
+    except OSError as e:
+        err, out = f'cannot run ssh: {e}', ''
+    SSH_STATE['error'], SSH_STATE['time'] = err, time.time()
+    return out
 
 
 def classify(root_names):

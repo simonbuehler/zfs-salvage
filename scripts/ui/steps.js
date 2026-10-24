@@ -21,7 +21,8 @@
     let w;
     try { w = await (await fetch('/api/workflow')).json(); } catch (e) { return; }
     const s = w.scan || {}, c = w.catalog || {}, sel = w.selection || {}, t = w.transfer || {}, best = w.newest || {};
-    const find = !c.txg ? 'build the catalog' : c.update ? 'newer state found – update catalog'
+    const alert = (w.alerts || [])[0];
+    const find = alert ? '⚠ ' + alert : !c.txg ? 'build the catalog' : c.update ? 'newer state found – update catalog'
       : (s.running ? `scan ${(s.pct || 0).toFixed(0)} % · ` : '') + `using ${best.date || 'TXG ' + n(c.txg)}`;
     const steps = [
       ['/', 'status', 1, 'Find a state', find, !c.txg || c.update ? 'todo' : 'done'],

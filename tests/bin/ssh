@@ -1,0 +1,13 @@
+#!/bin/bash
+# Fake ssh for the tests (put this directory first in PATH). The last argument is the "remote" command.
+#   FAKE_SSH=local     run the command on this machine (stdin and stdout pass through)
+#   FAKE_SSH=down      the host cannot be reached (ssh's own failure: exit status 255)
+#   FAKE_SSH=nozscan   reachable, but zscan is not installed
+#   FAKE_SSH=oldzscan  reachable, zscan does not know --max-vdev
+args=("$@"); cmd="${args[${#args[@]}-1]}"
+case "${FAKE_SSH:-local}" in
+  local) exec bash -c "$cmd" ;;
+  down) echo "ssh: connect to host fake port 22: Connection refused" >&2; exit 255 ;;
+  nozscan) case "$cmd" in "command -v zscan"*) exit 1 ;; esac; exit 0 ;;
+  oldzscan) case "$cmd" in "command -v zscan"*) exit 0 ;; zscan*) echo "unknown or incomplete option: --max-vdev"; exit 0 ;; esac; exit 0 ;;
+esac
