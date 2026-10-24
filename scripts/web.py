@@ -23,6 +23,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jobs  # noqa: E402
+import setup_api  # noqa: E402
 import status_page  # noqa: E402
 import transfer  # noqa: E402
 import common  # noqa: E402
@@ -223,17 +225,18 @@ def workflow():
         w['selection'] = {'files': f, 'bytes': b}
     newest = (w.get('newest') or {}).get('txg')
     w['catalog'] = {'txg': cat_txg, 'update': bool(newest and cat_txg and newest > cat_txg), 'job': CATALOG_JOB}
-    jobs = transfer.status()
+    tjobs = transfer.status()
     w['host'] = {'name': HOST, 'local': LOCAL}
-    w['transfer'] = {'jobs': len(jobs), 'running': any(j['state'] == 'running' for j in jobs),
-                     'last_label': jobs[-1].get('label') if jobs else None,
+    w['transfer'] = {'jobs': len(tjobs), 'running': any(j['state'] == 'running' for j in tjobs),
+                     'last_label': tjobs[-1].get('label') if tjobs else None,
                      'done': any(j['state'] == 'done' and (j.get('verify') or {}).get('state') == 'done'
-                                 and not j['verify'].get('bad_n') for j in jobs),     # copied AND verified
-                     'unverified': sum(1 for j in jobs if j['state'] == 'done'
+                                 and not j['verify'].get('bad_n') for j in tjobs),     # copied AND verified
+                     'unverified': sum(1 for j in tjobs if j['state'] == 'done'
                                        and (j.get('verify') or {}).get('state') != 'done'),
-                     'with_problems': sum(1 for j in jobs if (j.get('verify') or {}).get('bad_n')),
-                     'files': sum(j.get('files', 0) for j in jobs),
-                     'last_state': jobs[-1]['state'] if jobs else None}
+                     'with_problems': sum(1 for j in tjobs if (j.get('verify') or {}).get('bad_n')),
+                     'files': sum(j.get('files', 0) for j in tjobs),
+                     'last_state': tjobs[-1]['state'] if tjobs else None}
+    w['setup'] = {'case': bool(common.CASE), 'scan': setup_api.SCAN_JOB.st.get('state'), 'rank': setup_api.RANK_JOB.st.get('state')}
     return w
 
 
@@ -286,6 +289,14 @@ class H(BaseHTTPRequestHandler):
             return self.send(b'<meta http-equiv="refresh" content="5">Status page is being generated ...', ctype='text/html')
         if u.path in ('/select', '/auswahl'):
             return self.send(open(UI, 'rb').read(), ctype='text/html')
+        if u.path == '/setup':
+            return self.send(open(f'{REPO}/scripts/ui/setup.html', 'rb').read(), ctype='text/html')
+        if u.path == '/api/setup/state':
+            return self.send(setup_api.state())
+        if u.path == '/api/setup/doctor':
+            return self.send(setup_api.run_doctor())
+        if u.path == '/api/setup/devices':
+            return self.send(setup_api.devices(q.get('extra', '').split('\n')))
         if u.path == '/transfer':
             return self.send(open(f'{REPO}/scripts/ui/transfer.html', 'rb').read(), ctype='text/html')
         if u.path == '/api/transfer/preset':                    # optional prepared target
@@ -338,6 +349,18 @@ class H(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if self.path == '/api/catalog/rebuild':
             return self.send(rebuild_catalog(body.get('candidate')))
+        if self.path == '/api/setup/readonly':
+            return self.send(setup_api.make_read_only(str(body.get('dev', ''))))
+        if self.path == '/api/setup/probe':
+            return self.send(setup_api.probe(body))
+        if self.path == '/api/setup/case':
+            return self.send(setup_api.create_case(body))
+        if self.path in ('/api/jobs/probe/cancel', '/api/jobs/case/cancel'):
+            return self.send(setup_api.cancel(self.path.split('/')[3]))
+        if self.path == '/api/jobs/scan/start':
+            return self.send(setup_api.start_scan(body))
+        if self.path == '/api/jobs/scan/pause':
+            return self.send(setup_api.pause_scan())
         if self.path == '/api/target/choose':
             return self.send(*choose_target(body))
         if self.path == '/api/transfer/check':
@@ -389,8 +412,30 @@ def status_loop():
         time.sleep(20)
 
 
+def restart_when_a_case_was_written():
+    """Many settings are read from the case file when the modules are imported: after the setup page wrote a new case,
+    web.py starts again (same process, same port, same token) instead of running with the old values."""
+    while not setup_api.RESTART['pending']:
+        time.sleep(0.5)
+    time.sleep(1)                                     # let the last status request finish
+    jobs.shutdown()
+    os.environ['ZFS_SALVAGE_TOKEN'] = TOKEN
+    sys.stderr.flush()
+    os.execv(sys.executable, [sys.executable, '-I', os.path.abspath(__file__)])
+
+
+def stop(*_):
+    jobs.shutdown()
+    sys.exit(0)
+
+
 if __name__ == '__main__':
+    import signal
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
     ensure_schema()
+    setup_api.resume()
+    threading.Thread(target=restart_when_a_case_was_written, daemon=True).start()
     threading.Thread(target=status_loop, daemon=True).start()
     print(f'zfs-salvage web UI: http://localhost:{PORT}/?t={TOKEN}   (open this link; others are refused)', file=sys.stderr)
     ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

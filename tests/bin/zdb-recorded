@@ -1,0 +1,9 @@
+#!/bin/bash
+# A zdb that answers the two label calls make-case makes (-l, -luuuu) with recorded output of real zdb 2.2.2
+# (tests/data/zdb-recorded/<ZDB_RECORDED>.l.txt / .luuuu.txt), so the setup flow can be tested without zdb installed.
+dir="$(cd "$(dirname "$0")/../data/zdb-recorded" && pwd)"
+case "$1" in
+  -l) exec cat "$dir/$ZDB_RECORDED.l.txt" ;;
+  -luuuu) exec cat "$dir/$ZDB_RECORDED.luuuu.txt" ;;
+  *) echo "zdb-recorded: only -l and -luuuu are recorded" >&2; exit 1 ;;
+esac

@@ -1,5 +1,5 @@
-// Workflow step bar shared by all pages: 1 find a state -> 2 select files -> 3 transfer.
-// Usage: <nav id="steps" data-page="status|select|transfer"></nav><script src="/steps.js"></script>
+// Workflow step bar shared by all pages: 0 set up -> 1 find a state -> 2 select files -> 3 transfer.
+// Usage: <nav id="steps" data-page="setup|status|select|transfer"></nav><script src="/steps.js"></script>
 (function () {
   const css = `
   #steps{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
@@ -24,7 +24,10 @@
     const alert = (w.alerts || [])[0];
     const find = alert ? '⚠ ' + alert : !c.txg ? 'build the catalog' : c.update ? 'newer state found – update catalog'
       : (s.running ? `scan ${(s.pct || 0).toFixed(0)} % · ` : '') + `using ${best.date || 'TXG ' + n(c.txg)}`;
+    const su = w.setup || {};
     const steps = [
+      ['/setup', 'setup', 0, 'Set up', !su.case ? 'describe the pool' : su.scan === 'running' ? 'scanning'
+        : su.scan === 'done' ? 'scan complete' : 'case ready – start the scan', su.case ? 'done' : 'todo'],
       ['/', 'status', 1, 'Find a state', find, !c.txg || c.update ? 'todo' : 'done'],
       ['/select', 'select', 2, 'Select files', sel.files ? `${n(sel.files)} file${sel.files === 1 ? '' : 's'} · ${gb(sel.bytes)}`
         : 'nothing selected yet', sel.files ? 'done' : ''],

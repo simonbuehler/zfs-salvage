@@ -132,6 +132,18 @@ def tree_groups(probed, root_names=()):
     return out
 
 
+def hidden_newer(probed, best):
+    """Trees newer than the best readable state of the target that could not be read, and that have about as many objects
+    as that state: most likely newer states of the target, hidden by damage inside the file tree. (Unreadable newer
+    trees of other sizes belong to other datasets and are not counted.)"""
+    if not best:
+        return {'count': 0}
+    ref = best.get('objects') or 0
+    hits = [r for r in probed.values() if not r.get('ok') and r.get('birth', 0) > best['birth']
+            and r.get('objects') is not None and abs(r['objects'] - ref) <= max(0.1 * ref, 50)]
+    return {'count': len(hits), 'newest_birth': max((r['birth'] for r in hits), default=None), 'best_birth': best['birth']}
+
+
 def run(limit):
     reload_case()                                                 # the target may have been chosen in the UI meanwhile
     os.makedirs(os.path.dirname(PROBED), exist_ok=True)          # a fresh installation has no status directory yet
@@ -224,7 +236,8 @@ def run(limit):
     pending = max(len(todo) - len(batch), 0)
     with open(PROBE_STATS, 'w') as f:
         json.dump({'probed': len(probed), 'pending': pending, 'deferred': deferred, 'target': TARGET_NAME,
-                   'target_states': len(states), 'by_dataset': by_dataset, **health}, f, ensure_ascii=False)
+                   'target_states': len(states), 'by_dataset': by_dataset, 'hidden_newer': hidden_newer(probed, states[0] if states else None),
+                   **health}, f, ensure_ascii=False)
     print(f'probed {len(batch)} new, total {len(probed)}, pending {pending}, deferred {deferred}, '
           f'{TARGET_NAME} states {len(states)}, newest {states[0]["birth"] if states else "-"}; {by_dataset}', flush=True)
     return scan_running or pending or deferred

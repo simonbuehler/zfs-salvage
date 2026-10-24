@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>zfs-salvage setup</title>
+<style>
+:root{--bg:#f7f7f5;--fg:#1d1d1b;--mut:#6b6b66;--card:#fff;--line:#e2e2dc;--acc:#2f6f4f;--accbg:#e3efe8;--onacc:#fff;--bad:#d03b3b;--ok:#0ca30c}
+@media (prefers-color-scheme:dark){:root{--bg:#151614;--fg:#e8e8e3;--mut:#9a9a93;--card:#1e1f1c;--line:#33342f;--acc:#7fc29b;--accbg:#22332a;--onacc:#10140f;--bad:#e66767;--ok:#4cc14c}}
+[hidden]{display:none!important} *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif} a{color:var(--acc)}
+main{max-width:1000px;margin:0 auto;padding:14px 16px 24px}
+h1{font-size:18px;margin:0} h2{font-size:14.5px;margin:0 0 8px} .mut{color:var(--mut);font-size:12.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.tile{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--card);cursor:pointer;font:inherit;color:var(--fg)}
+.tile.on{border-color:var(--acc);background:var(--accbg);box-shadow:inset 0 0 0 1px var(--acc)} .tile .ic{font-size:20px;line-height:1}
+.tile b{display:block} .tile small{color:var(--mut)}
+.field{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;align-items:center;margin-top:10px}
+@media (max-width:600px){.field{grid-template-columns:1fr}}
+input,select,button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:7px;padding:7px 10px;min-width:0}
+button{cursor:pointer} button.pri{background:var(--acc);color:var(--onacc);border-color:var(--acc)} button:disabled{opacity:.5;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:6px} .chip{border-radius:999px;padding:4px 11px;font-size:12.5px}
+.check{margin-top:12px;padding:8px 10px;border-radius:7px;background:var(--bg)} .ok{color:var(--ok)} .bad{color:var(--bad)}
+.go{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap} .go button.pri{font-size:15px;padding:9px 16px}
+.bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0} .bar>div{height:100%;background:var(--acc)}
+.job{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:8px}
+.job .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .job .hd b{flex:1;min-width:0;word-break:break-all}
+.log{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--mut);white-space:pre-wrap;max-height:9em;overflow:auto;margin-top:6px}
+.num{font-variant-numeric:tabular-nums}
+</style>
+<style>
+.rows>div{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)} .rows>div:last-child{border:0}
+.rows b{min-width:0;word-break:break-all} .grow{flex:1;min-width:0} .warn{color:#b37b00}
+table{width:100%;border-collapse:collapse} td,th{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);font-size:13px} th{font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <nav id="steps" data-page="setup"></nav>
+  <h1>Set up: describe the pool and start the scan</h1>
+  <div class="mut">The tool only reads the pool's disks. It never asks for passwords and never unlocks, partitions or imports anything.</div>
+  <div class="check" id="restart" hidden>⟳ The case file was written – the server restarts with it …</div>
+
+  <section class="card">
+    <h2>1 · Is this machine ready?</h2>
+    <div class="rows" id="doctor"><span class="mut">checking …</span></div>
+    <div class="go"><button onclick="loadDoctor()">Check again</button></div>
+  </section>
+
+  <section class="card">
+    <h2>2 · The pool's disks</h2>
+    <div class="mut">Encrypted (LUKS)? Open them read-only yourself first, e.g. <code>sudo cryptsetup open --readonly /dev/sdX4 ro_sdX4</code>, and add the
+      opened device below. A failing disk: make an image with ddrescue and add the image file.</div>
+    <div class="rows" id="devs"><span class="mut">…</span></div>
+    <div class="field"><span>Other device or image file</span><div class="chips"><input id="extra" class="grow" placeholder="/dev/mapper/ro_sdX4 or /mnt/target/disk0.img"><button onclick="addDev()">Add</button></div></div>
+    <div class="go"><button class="pri" id="probe" onclick="probe()">Examine the pool</button><span class="mut" id="probeinfo"></span></div>
+    <div class="log" id="probelog" hidden></div>
+  </section>
+
+  <section class="card" id="poolcard" hidden>
+    <h2>3 · Which dataset do you want to recover?</h2>
+    <div id="pool" class="mut"></div>
+    <table id="ds"></table>
+    <div class="go"><button class="pri" id="mkcase" onclick="createCase()">Create the case</button><span class="mut" id="caseinfo"></span></div>
+    <div class="log" id="caselog" hidden></div>
+  </section>
+
+  <section class="card" id="casecard" hidden>
+    <h2>4 · Scan the disks</h2>
+    <div id="case"></div>
+    <div class="go"><button class="pri" id="scan" onclick="scan(false)">Start scan</button><button id="pause" onclick="pause()">Pause</button>
+      <span class="mut" id="scaninfo"></span></div>
+    <div class="bar"><div id="scanbar" style="width:0%"></div></div>
+    <div class="log" id="scanlog"></div>
+    <div class="go"><a href="/">Watch the progress and choose a state →</a></div>
+  </section>
+</main>
+<script src="/steps.js"></script>
+<script>
+const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const postJ=async(u,b)=>(await fetch(u,{method:'POST',body:JSON.stringify(b||{})})).json();
+const ICON={OK:'<span class="ok">✓</span>',WARN:'<span class="warn">!</span>',FAIL:'<span class="bad">✗</span>'};
+let extra=[], chosen=null, st=null;
+async function loadDoctor(){$('doctor').innerHTML='<span class="mut">checking …</span>';
+  const r=await (await fetch('/api/setup/doctor')).json();
+  const rows=r.map(c=>`<div>${ICON[c.status]||''}<b>${esc(c.check)}</b><span class="grow">${esc(c.text)}${c.status!=='OK'&&c.hint?`<br><span class="mut">→ ${esc(c.hint)}</span>`:''}</span></div>`).join('');
+  const n=s=>r.filter(c=>c.status===s).length;
+  // problems are shown at once; without any, the list stays folded
+  $('doctor').innerHTML=n('FAIL')?rows:`<details><summary>${ICON.OK} ${n('OK')} ok, ${n('WARN')} warning(s), no problems – show all</summary>${rows}</details>`}
+async function loadDevs(){const r=await (await fetch('/api/setup/devices?extra='+encodeURIComponent(extra.join('\n')))).json();
+  $('devs').innerHTML=r.length?r.map(d=>`<div><input type="checkbox" class="dev" value="${esc(d.path)}" ${d.exists?'checked':''}><b class="grow">${esc(d.path)}</b>`+
+    (!d.exists?'<span class="bad">missing</span>':d.read_only?'<span class="ok">✓ read-only</span>':
+     `<span class="bad">writable</span><button onclick="ro('${esc(d.path)}')">make read-only</button>`)+'</div>').join('')
+    :'<span class="mut">No ZFS member device found. Attach the disks, or add an opened device or an image file below.</span>'}
+function addDev(){const v=$('extra').value.trim(); if(v&&!extra.includes(v))extra.push(v); $('extra').value=''; loadDevs()}
+async function ro(dev){const r=await postJ('/api/setup/readonly',{dev}); if(!r.ok)alert(r.info); loadDevs()}
+const devs=()=>[...document.querySelectorAll('.dev:checked')].map(x=>x.value);
+async function probe(){const r=await postJ('/api/setup/probe',{devs:devs()}); if(r.state==='refused')$('probeinfo').textContent='✗ '+r.info; poll()}
+async function createCase(){const t=document.querySelector('input[name=ds]:checked'); if(!t){$('caseinfo').textContent='choose a dataset';return}
+  const r=await postJ('/api/setup/case',{devs:st.probe.devices,target:t.value}); if(r.state==='refused')$('caseinfo').textContent='✗ '+r.info; poll()}
+async function scan(anyway){const r=await postJ('/api/jobs/scan/start',{anyway});
+  if(r.state==='needs_confirmation'){if(confirm(r.info+'\n\nScan it anyway?'))return scan(true); return}
+  if(r.state==='refused')$('scaninfo').textContent='✗ '+r.info; poll()}
+async function pause(){await postJ('/api/jobs/scan/pause'); poll()}
+const run=j=>j&&(j.state==='running'||j.state==='restarting');
+function jobLine(j,what){if(!j||j.state==='idle')return '';
+  return {running:`⟳ ${what} …`,restarting:`⟳ ${what}: restarting after a failure`,done:`✓ ${what}: done`,failed:`✗ ${what} failed (exit ${j.exit})`,
+          stopped:`${what}: paused`,interrupted:`${what} was interrupted`}[j.state]||j.state}
+async function poll(){
+  try{st=await (await fetch('/api/setup/state')).json()}catch(e){$('restart').hidden=false;return setTimeout(poll,1500)}
+  $('restart').hidden=!st.restarting; const J=st.jobs, p=st.probe;
+  $('probeinfo').textContent=jobLine(J.probe,'examining the pool'); $('probe').disabled=run(J.probe);
+  $('probelog').hidden=!run(J.probe)&&J.probe.state!=='failed'; $('probelog').textContent=(J.probe.tail||[]).join('\n');
+  if(p){$('poolcard').hidden=false;
+    $('pool').innerHTML=`Pool <b>${esc(p.pool)}</b> · ${esc(p.topology)} · ${p.vdevs.length} top-level vdev(s) · ${p.uberblocks} uberblocks · `+
+      (p.open_txg?`metadata readable at TXG ${p.open_txg}`:'<span class="bad">the pool\'s metadata cannot be read – the scan can still find file systems</span>');
+    if(!$('ds').dataset.done){$('ds').dataset.done=1;
+      $('ds').innerHTML='<tr><th></th><th>Dataset</th><th>State</th><th>Objects</th></tr>'+p.datasets.map(d=>
+        `<tr><td><input type="radio" name="ds" value="${esc(d.name)}" ${d.name===p.proposed_target?'checked':''}></td><td>${esc(d.name)}</td>`+
+        `<td>${d.readable?'<span class="ok">readable</span>':'<span class="bad">cannot be read</span> <span class="mut">'+esc(d.error||'')+'</span>'}</td><td class="num">${d.objects??''}</td></tr>`).join('')+
+        `<tr><td><input type="radio" name="ds" value="" id="dsother"></td><td colspan="3"><input id="dsname" style="width:100%" placeholder="not in the list (destroyed)? type its name, e.g. tank/home" oninput="$('dsother').value=this.value;$('dsother').checked=true"></td></tr>`}}
+  $('caseinfo').textContent=jobLine(J.case,'writing the case'); $('mkcase').disabled=run(J.case)||run(J.scan);
+  $('caselog').hidden=J.case.state!=='failed'; $('caselog').textContent=(J.case.tail||[]).filter(l=>/NOT SUPPORTED|->|problem|Several/i.test(l)).join('\n');
+  const c=st.case;
+  if(c){$('casecard').hidden=false;
+    $('case').innerHTML=`<div>Case <b>${esc(c.name)}</b>: dataset <b>${esc(c.target)}</b> of pool ${esc(c.pool)}</div>`+
+      (c.diagnosis?`<div class="check">${esc(c.diagnosis.text)}</div>`:'')+
+      ((c.compatibility||[]).map(x=>`<div class="${x.blocking?'bad':'mut'}">${x.blocking?'✗ not supported: ':'note: '}${esc(x.text)}</div>`).join(''));
+    $('scaninfo').textContent=[jobLine(J.scan,'scan'),jobLine(J.rank,'checking the finds')].filter(Boolean).join(' · ');
+    $('scan').disabled=run(J.scan); $('pause').disabled=!run(J.scan)&&!run(J.rank);
+    $('scanlog').textContent=(J.scan.tail||[]).concat(J.rank.tail?J.rank.tail.slice(-3):[]).join('\n');
+    try{const w=await (await fetch('/api/workflow')).json(); $('scanbar').style.width=(J.scan.state==='done'?100:((w.scan||{}).pct||0))+'%'}catch(e){}}
+  setTimeout(poll, run(J.probe)||run(J.case)||run(J.scan)||run(J.rank)||st.restarting?2000:6000)}
+extra=[]; loadDoctor(); loadDevs(); poll();
+</script>
+</body>
+</html>

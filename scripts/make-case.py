@@ -310,6 +310,8 @@ def main():
                     help='seconds allowed for reading the datasets from the metadata (default %(default)s)')
     ap.add_argument('--force', action='store_true',
                     help='write the case file even if the pool has properties that are not supported (exit code 0)')
+    ap.add_argument('--probe-json', metavar='FILE',
+                    help='only look at the pool (steps 1-5) and write what was found to FILE as JSON; no questions, no case file')
     a = ap.parse_args()
     ZDB_TIMEOUT = a.zdb_timeout
 
@@ -369,6 +371,16 @@ def main():
                      'indirect_block_size': readable[0]['meta_dnode']['indirect_block_size'],
                      'dnode_block_size': readable[0]['meta_dnode']['dnode_block_size']})
     print(f'   {prof}')
+    if a.probe_json:                         # for the setup page: the user picks the target from this
+        summary = {'pool': pool, 'topology': topo, 'ashift': lab['ashift'], 'devices': devs, 'vdevs': vdev_groups(labels),
+                   'open_txg': txg, 'uberblocks': len(ubs), 'newest_txg': ubs[-1][0] if ubs else None,
+                   'datasets': [{k: d.get(k) for k in ('name', 'type', 'readable', 'error', 'objects', 'size')} for d in datasets],
+                   'proposed_target': unreadable[0]['name'] if len(unreadable) == 1 else None, 'problems': PROBLEMS}
+        with open(a.probe_json + '.tmp', 'w') as f:
+            json.dump(summary, f, ensure_ascii=False)
+        os.replace(a.probe_json + '.tmp', a.probe_json)
+        print(f'== written {a.probe_json}')
+        return
 
     print('== 6. target dataset')
     if not a.target and len(unreadable) > 1:                      # several candidates: do not guess

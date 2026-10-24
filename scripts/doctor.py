@@ -308,7 +308,7 @@ def check_import(args):
 
 def check_case(args):
     if common.CASE == {}:
-        return WARN, 'no case file yet', f'The setup step creates it (scripts/make-case.py, writes to {common.CASES}).'
+        return WARN, 'no case file yet', 'Normal at the start: step 0 "Set up" of the web UI creates it (or ./zfs-salvage make-case).'
     problems = validate(common.CASE)
     if problems:
         return FAIL, f'the case file is not valid: {problems[0]}' + (f' (+{len(problems) - 1} more)' if len(problems) > 1 else ''), \

@@ -34,9 +34,20 @@ def _under_state(p):
     return p if os.path.isabs(p) else f'{STATE}/{p}'
 
 
+ACTIVE_CASE = f'{STATE}/active-case'             # path of the case made in the setup page (several may exist)
+
+
 def case_path():
-    return os.environ.get('ZFS_SALVAGE_CASE') or next(
-        (p for p in sorted(glob.glob(f'{CASES}/*.json')) if not p.endswith('example.json')), None)
+    if os.environ.get('ZFS_SALVAGE_CASE'):
+        return os.environ['ZFS_SALVAGE_CASE']
+    try:
+        with open(ACTIVE_CASE) as f:
+            active = f.read().strip()
+        if os.path.exists(active):
+            return active
+    except OSError:
+        pass
+    return next((p for p in sorted(glob.glob(f'{CASES}/*.json')) if not p.endswith('example.json')), None)
 
 
 def load_case():

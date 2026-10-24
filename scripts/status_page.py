@@ -331,6 +331,11 @@ def main():
     scan_err = [l for l in log.splitlines()[-3:] if l.startswith('ERROR:')]
     if scan_err:
         alerts.append(('error', 'Scan: ' + scan_err[-1][6:].strip()))
+    hidden = pstats.get('hidden_newer') or {}
+    if hidden.get('count'):
+        alerts.append(('warn', f'{hidden["count"]} newer state(s) of this file system, up to {txg_label(hidden["newest_birth"])}, could not be '
+                       'read: damage inside the file tree hides them. The best readable state is older, so changes made after it '
+                       f'({txg_label(hidden["best_birth"])}) are missing from the catalog.'))
     if pstats.get('slow_mode'):
         alerts.append(('warn', 'Slow mode: the C library is not used on the recovery host, reading falls back to '
                        'pure Python. ' + (pstats.get('slow_reason') or '').replace('zsread: SLOW MODE - ', '')))

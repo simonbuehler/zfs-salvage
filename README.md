@@ -122,26 +122,18 @@ the web UI opens in its browser.
    `tar xzf zfs-salvage-*.tar.gz && cd zfs-salvage-*`
 5. **Check the machine:** `sudo ./zfs-salvage doctor`. Fix every `FAIL` ([Troubleshooting](#troubleshooting)).
    `zdb` comes with the live image; if it is missing: `sudo apt install zfsutils-linux`.
-   Warnings about missing devices and a missing case file are normal at this point; run `doctor` again after step 6.
-6. **Describe the pool:** `sudo ./zfs-salvage make-case --dev /dev/sdX3` (one `--dev` per disk).
-   It reads the labels, tells you what the pool uses and whether that is supported, and writes the case file.
-   Press Enter to accept the proposed answers; you can leave "names you expect in the root directory" empty.
-   It ends with a **Diagnosis** line that says where the way to your files is broken. Which one you get depends on your pool:
-   the dataset is listed but its object set block cannot be read (`UNREADABLE …`: the damage this tool works around, carry on);
-   the dataset is not in the list at all (destroyed, or a wrong name: its old trees may still be on the disk); the pool's own
-   metadata cannot be read (the scan still looks for file system trees); or the dataset opens normally (then you are here for files
-   that were deleted later: use an older state in the web UI). If several datasets are unreadable it asks which one you want
-   (with `--yes` you must say `--target <name>`).
-7. **Scan the disks.** Open two more terminal windows in the same folder. In the first run
-   `sudo ./zfs-salvage scan /dev/sdX3`, in the second `sudo ./zfs-salvage rank --loop`. For a stripe
-   scan one disk of every top-level vdev, for a mirror any one disk. A scan reads at about 150–190 MB/s (a 1 TB
-   disk takes about 1½ hours); stop it with Ctrl+C and start the same command again to resume. The scan ends with
-   `ALL CHUNKS: n/n`. Start `rank --loop` once the scan has written its first chunk: it stops by itself with "nothing pending - done"
-   when there is nothing to check (and no scan running), so run it again after the scan ends. "states 0" in its output at first is normal.
-8. **Open the web UI:** `sudo ./zfs-salvage` (it runs the checks again, then opens http://localhost:8765 in your browser; the link it
+   Warnings about missing devices and a missing case file are normal at this point.
+6. **Open the web UI:** `sudo ./zfs-salvage` (it runs the checks again, then opens http://localhost:8765 in your browser; the link it
    prints ends in `?t=…`, a secret for this session: the server answers nobody else, so use that link if the browser does not open).
-   If two or more file systems are offered, choose the one whose folder names you recognise; a group with only one tree and an
-   old TXG is often just the pool's own root file system (its folders are the mount points of the others).
+7. **Step 0 "Set up"** in the UI: tick the pool's disks (the button makes them read-only), *Examine the pool*, choose the dataset
+   to recover (an unreadable one is proposed; type the name if it was destroyed), *Create the case*, *Start scan*.
+   The case shows a **Diagnosis** that says where the way to your files is broken: the dataset is listed but its object set block
+   cannot be read (the damage this tool works around); the dataset is not in the list at all (destroyed, or a wrong name: its old
+   trees may still be on the disk); the pool's own metadata cannot be read (the scan still looks for file system trees); or the
+   dataset opens normally (then you are here for files that were deleted later: use an older state in step 1).
+   A scan reads at about 150–190 MB/s (a 1 TB disk takes about 1½ hours). *Pause* stops it, *Start scan* resumes it; it also
+   resumes by itself when you start `./zfs-salvage` again.
+8. **Steps 1–3** below: choose a state, select files, copy them.
 
 Then follow the three steps in the UI:
 
@@ -149,6 +141,8 @@ Then follow the three steps in the UI:
    recoverable state with its date and distance to the last change, and the button that builds or updates the catalog.
    Every older state is listed too: to get back files you deleted later, or a destroyed file system, build the catalog from a
    state from before that (the longer the pool was used afterwards, the more of the old blocks are overwritten).
+   If newer states exist on the disk but cannot be read because something inside the file tree is destroyed, the page says so
+   (with the TXG up to which changes are missing) instead of quietly showing the older state as the best one.
 2. **Select files:** folder tree with tri-state checkboxes, quick filters (photos & videos,
    documents, everything without hidden folders), name, date and size filters, and a list of unreadable entries.
 3. **Transfer:** pick this computer, another computer (hosts from `~/.ssh/config`) or a disk of the
@@ -157,6 +151,14 @@ Then follow the three steps in the UI:
 
 All results (scan chunks, catalog, case file, logs) are in `data/` next to `zfs-salvage`. Delete that
 folder to start over; the pool's disks are never touched.
+
+### Without the web UI
+
+The same setup works on the command line (scripts, other machines): `sudo ./zfs-salvage make-case --dev /dev/sdX3` (one `--dev` per
+disk; press Enter to accept the proposed answers, with `--yes` and several unreadable datasets you must say `--target <name>`), then
+`sudo ./zfs-salvage scan /dev/sdX3` (it ends with `ALL CHUNKS: n/n`) and `sudo ./zfs-salvage rank --loop`, which stops by itself with
+"nothing pending - done" when there is nothing to check and no scan running ("states 0" at first is normal). For a stripe scan one
+disk of every top-level vdev, for a mirror any one disk.
 
 ### Failing disks
 

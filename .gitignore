@@ -23,6 +23,13 @@ logs/status.log
 logs/*.err
 logs/web.log
 logs/rank-trees.log
+logs/make-case.log
+logs/scan-job.log
+# jobs of the web UI and the setup page (state below the data directory, which is the repository by default)
+jobs/
+setup/
+active-case
+data/
 
 # catalog and transfers (rebuilt from logs/tree; selection and manifests are per user)
 catalog/*.sqlite

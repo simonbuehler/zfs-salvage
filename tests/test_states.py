@@ -29,7 +29,7 @@ class Rescue:
         self.side = fx.sidecars()[variant]
         self.work = fx.tmpdir()
         self.proc = None
-        dev = fx.unpack(variant, os.path.join(self.work, 'img'))[0]
+        dev = self.case_dev = fx.unpack(variant, os.path.join(self.work, 'img'))[0]
         os.chmod(dev, os.stat(dev).st_mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
         raw = os.path.join(self.work, 'raw')
         case = {'name': variant, 'pool': {'name': self.side['pool'], 'devices': [{'path': dev, 'vdev': 0}]},
