@@ -60,16 +60,23 @@ zfs-salvage:   scan disk → find dnode-tree roots (L6 / objset blocks) → veri
 
 ## Capability matrix
 
+<!-- capability-matrix:start -->
 | Area | Supported | Not yet |
 |---|---|---|
-| Vdev layout | single disk, mirror (any copy, both DVAs), several top-level vdevs (stripe of mirrors) | raidz, dRAID |
-| Compression | off, lzjb, lz4 | zstd, gzip |
-| Checksum | fletcher4, sha256 | blake3, skein, … |
-| Blocks | regular and embedded block pointers, 16 KiB and 128 KiB indirect blocks | gang blocks |
-| Dnodes | 512-byte dnodes, SA and legacy znode attributes | large dnodes, spill blocks |
-| Datasets | file systems; zvols (copied as one sparse `.raw` image) | clones' origin chains, snapshots as separate trees |
+| Vdev layout | mirror (any copy, both DVAs), several top-level vdevs (stripe of mirrors), single disk, special vdev (all devices present) | missing special vdev, pool starting inside the device, raidz, raidz with a missing disk, raidz2, dRAID |
+| Compression | lz4, lzjb | zstd, gzip |
+| Checksum | fletcher4, sha256 | blake3, skein, sha512, edonr |
+| Blocks | 128 KiB indirect blocks, 16 KiB indirect blocks, embedded block pointers | gang blocks |
+| Dnodes | 512-byte dnodes, large dnodes (file data; extended attributes may be missing) | spill blocks |
+| Datasets | several file systems in one pool, zvols (copied as one sparse .raw image) | — |
+| Recovery | destroyed datasets, files deleted later (older state) | — |
 | Encryption | below ZFS (LUKS etc., opened read-only) | native ZFS encryption |
 | Targets | local path (WSL drive letters too), SSH to Linux/Windows, recovery host disk | — |
+<!-- capability-matrix:end -->
+
+The table is generated from the pipeline tests (`tests/run.sh --matrix`, `scripts/gen-matrix.py`): *Supported* is what
+extracts byte-exact from the test pools (for most of them also with the object set block destroyed); *Not yet* are the tests that are expected to fail and the features
+without a test pool.
 
 The pool's parameters live in a **case file** (`cases/<name>.json`), not in the code.
 `scripts/make-case.py` creates the case file from `zdb` output. It asks only for what it cannot detect, such as the
@@ -229,8 +236,7 @@ A Gentoo NAS crashed in October 2014 (ZFS 0.6.3, mirror on LUKS). Afterwards `rp
   one is from 2014-10-23 03:23 (TXG 728,869, 52,333 objects), 16.6 hours before the dataset's last change.
 - Files are copied with every block verified. The first restores were byte-exact.
 
-Details: docs/analysis-2026-10-23.md,
-[docs/design.md](docs/design.md).
+Details: [docs/design.md](docs/design.md).
 
 ## Extending it
 
@@ -240,4 +246,4 @@ pool image. Add the feature to the capability matrix and to the compatibility ch
 
 ## License
 
-Not decided yet.
+[MIT](LICENSE).

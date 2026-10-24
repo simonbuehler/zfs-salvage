@@ -1,0 +1,34 @@
+{
+ "_comment": "Which capability of the README matrix each fixture variant (and its -damaged form) demonstrates. tests/run.sh --matrix turns the runner's results into tests/capabilities.json, scripts/gen-matrix.py renders the README table from that.",
+ "areas": ["Vdev layout", "Compression", "Checksum", "Blocks", "Dnodes", "Datasets", "Recovery", "Encryption", "Targets"],
+ "variants": {
+  "legacy-single": [["Vdev layout", "single disk"], ["Compression", "lzjb"], ["Checksum", "fletcher4"], ["Blocks", "16 KiB indirect blocks"], ["Dnodes", "512-byte dnodes"]],
+  "modern-single": [["Compression", "lz4"], ["Blocks", "128 KiB indirect blocks"], ["Blocks", "embedded block pointers"]],
+  "modern-mirror": [["Vdev layout", "mirror (any copy, both DVAs)"]],
+  "modern-stripe": [["Vdev layout", "several top-level vdevs (stripe of mirrors)"]],
+  "modern-sha256": [["Checksum", "sha256"]],
+  "modern-twodatasets": [["Datasets", "several file systems in one pool"]],
+  "modern-zvol": [["Datasets", "zvols (copied as one sparse .raw image)"]],
+  "modern-deleted": [["Recovery", "files deleted later (older state)"]],
+  "modern-destroyed": [["Recovery", "destroyed datasets"]],
+  "unsupported-largednode": [["Dnodes", "large dnodes (file data; extended attributes may be missing)"]],
+  "unsupported-special": [["Vdev layout", "special vdev (all devices present)"]],
+  "modern-offset": [["Vdev layout", "pool starting inside the device"]],
+  "raidz1-4": [["Vdev layout", "raidz"]],
+  "raidz2-5": [["Vdev layout", "raidz2"]],
+  "raidz1-4-missing": [["Vdev layout", "raidz with a missing disk"]],
+  "unsupported-encrypted": [["Encryption", "native ZFS encryption"]],
+  "unsupported-special-missing": [["Vdev layout", "missing special vdev"]]
+ },
+ "untested_not_yet": [
+  ["Vdev layout", "dRAID"],
+  ["Compression", "zstd, gzip"],
+  ["Checksum", "blake3, skein, sha512, edonr"],
+  ["Blocks", "gang blocks"],
+  ["Dnodes", "spill blocks"]
+ ],
+ "by_hand_supported": [
+  ["Encryption", "below ZFS (LUKS etc., opened read-only)"],
+  ["Targets", "local path (WSL drive letters too), SSH to Linux/Windows, recovery host disk"]
+ ]
+}

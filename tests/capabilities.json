@@ -1,0 +1,202 @@
+{
+ "capabilities": [
+  {
+   "area": "Vdev layout",
+   "capability": "mirror (any copy, both DVAs)",
+   "variants": [
+    "modern-mirror",
+    "modern-mirror-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "missing special vdev",
+   "variants": [
+    "unsupported-special-missing"
+   ],
+   "status": "not yet"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "pool starting inside the device",
+   "variants": [
+    "modern-offset"
+   ],
+   "status": "not yet"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "raidz",
+   "variants": [
+    "raidz1-4"
+   ],
+   "status": "not yet"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "raidz with a missing disk",
+   "variants": [
+    "raidz1-4-missing"
+   ],
+   "status": "not yet"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "raidz2",
+   "variants": [
+    "raidz2-5"
+   ],
+   "status": "not yet"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "several top-level vdevs (stripe of mirrors)",
+   "variants": [
+    "modern-stripe",
+    "modern-stripe-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "single disk",
+   "variants": [
+    "legacy-single",
+    "legacy-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Vdev layout",
+   "capability": "special vdev (all devices present)",
+   "variants": [
+    "unsupported-special"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Compression",
+   "capability": "lz4",
+   "variants": [
+    "modern-single",
+    "modern-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Compression",
+   "capability": "lzjb",
+   "variants": [
+    "legacy-single",
+    "legacy-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Checksum",
+   "capability": "fletcher4",
+   "variants": [
+    "legacy-single",
+    "legacy-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Checksum",
+   "capability": "sha256",
+   "variants": [
+    "modern-sha256",
+    "modern-sha256-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Blocks",
+   "capability": "128 KiB indirect blocks",
+   "variants": [
+    "modern-single",
+    "modern-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Blocks",
+   "capability": "16 KiB indirect blocks",
+   "variants": [
+    "legacy-single",
+    "legacy-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Blocks",
+   "capability": "embedded block pointers",
+   "variants": [
+    "modern-single",
+    "modern-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Dnodes",
+   "capability": "512-byte dnodes",
+   "variants": [
+    "legacy-single",
+    "legacy-single-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Dnodes",
+   "capability": "large dnodes (file data; extended attributes may be missing)",
+   "variants": [
+    "unsupported-largednode"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Datasets",
+   "capability": "several file systems in one pool",
+   "variants": [
+    "modern-twodatasets",
+    "modern-twodatasets-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Datasets",
+   "capability": "zvols (copied as one sparse .raw image)",
+   "variants": [
+    "modern-zvol",
+    "modern-zvol-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Recovery",
+   "capability": "destroyed datasets",
+   "variants": [
+    "modern-destroyed"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Recovery",
+   "capability": "files deleted later (older state)",
+   "variants": [
+    "modern-deleted",
+    "modern-deleted-damaged"
+   ],
+   "status": "supported"
+  },
+  {
+   "area": "Encryption",
+   "capability": "native ZFS encryption",
+   "variants": [
+    "unsupported-encrypted"
+   ],
+   "status": "not yet"
+  }
+ ]
+}

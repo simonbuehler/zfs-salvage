@@ -1,0 +1,40 @@
+# Tests on every push and pull request. The fixture pools (about 30 MB) are not in git: they are a release asset,
+# the one named by FIXTURES_URL (create it with tests/pack-fixtures.sh and upload it to a release called fixtures-N).
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FIXTURES_URL: https://github.com/${{ github.repository }}/releases/download/fixtures-1/fixtures.tar
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the portable binaries and check them
+        run: tools/build-portable.sh
+
+      - name: Fetch the fixture pools
+        run: tests/fetch-fixtures.sh "$FIXTURES_URL"
+
+      - name: Unit and integration tests
+        run: python3 -W error::ResourceWarning -m unittest discover -s tests
+
+      - name: Pipeline on every fixture pool (and the capability matrix)
+        run: tests/run.sh --matrix
+
+      - name: The capability matrix is up to date
+        run: |
+          git diff --exit-code tests/capabilities.json
+          scripts/gen-matrix.py --check
+
+      - name: End to end through the web API
+        run: tests/e2e-local.sh

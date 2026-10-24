@@ -292,11 +292,38 @@ def plan(names):
     return out
 
 
+def write_matrix(results, path):
+    """tests/capabilities.json: what each capability of tests/capability_map.json did in this run. Deterministic (no timings),
+    so that a changed file in git means a changed capability."""
+    with open(os.path.join(HERE, 'capability_map.json')) as f:
+        cmap = json.load(f)
+    caps = {}
+    for display, status in results:
+        base = display[:-8] if display.endswith('-damaged') else display
+        for area, cap in cmap['variants'].get(base, []):
+            e = caps.setdefault((area, cap), {'area': area, 'capability': cap, 'variants': [], 'statuses': set()})
+            e['variants'].append(display)
+            e['statuses'].add(status)
+    out = []
+    for e in caps.values():
+        st = e.pop('statuses')
+        e['status'] = 'supported' if st == {'PASS'} else 'not yet' if st == {'XFAIL'} else 'mixed: ' + '/'.join(sorted(st))
+        e['variants'] = sorted(e['variants'])
+        out.append(e)
+    out.sort(key=lambda e: (cmap['areas'].index(e['area']), e['capability']))
+    with open(path, 'w') as f:
+        json.dump({'capabilities': out}, f, indent=1)
+        f.write('\n')
+    return [e for e in out if e['status'] not in ('supported', 'not yet')]
+
+
 def main():
     args = sys.argv[1:]
     verbose = '-v' in args
     use_lib = '--no-lib' not in args
+    matrix = '--matrix' in args
     names = [a for a in args if not a.startswith('-')]
+    results = []
     if not fx.ensure_built():
         sys.exit('cannot build zscan / libzsalvage.so (gcc missing?)')
     zsdir = prepare_zsread(use_lib)
@@ -331,9 +358,20 @@ def main():
             else:
                 status = 'FAIL'
                 failures += 1
+            results.append((display, status))
             print(f'{status} {display} {detail}' + (f'  ({time.time() - t0:.1f} s)' if verbose else ''), flush=True)
     finally:
         shutil.rmtree(zsdir, ignore_errors=True)
+    if matrix:
+        if names or failures or any(st not in ('PASS', 'XFAIL') for _, st in results) or not results:
+            print('no matrix written: it needs a complete run of every variant without FAIL, XPASS or SKIP', file=sys.stderr)
+            failures += 1
+        else:
+            bad = write_matrix(results, os.path.join(HERE, 'capabilities.json'))
+            for e in bad:
+                print(f'{e["status"]} {e["area"]}: {e["capability"]} ({", ".join(e["variants"])})', file=sys.stderr)
+            failures += len(bad)
+            print('wrote tests/capabilities.json')
     sys.exit(min(failures, 255))
 
 
