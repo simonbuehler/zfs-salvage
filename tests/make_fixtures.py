@@ -169,6 +169,8 @@ DERIVED = {
     'modern-offset': {'base': 'modern-single', 'embed_offset': (1 << 20) + 7 * 512,
                       'purpose': 'vdev start finder'},
     'raidz1-4-missing': {'base': 'raidz1-4', 'omit': ['d3.img'], 'purpose': 'refused until raidz parity reconstruction exists'},
+    'unsupported-special-missing': {'base': 'unsupported-special', 'omit': ['d1.img'],
+                                    'purpose': 'special vdev (metadata) missing: clear refusal'},
 }
 SKIPPED = {'modern-hightxg': 'needs ~1,000,000 TXGs; not generated (the --max-txg check is tested instead)'}
 

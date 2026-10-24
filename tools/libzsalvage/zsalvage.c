@@ -2,8 +2,10 @@
  * libzsalvage – fast helpers for zsread.py (via ctypes):
  *   zs_fletcher4(buf, len, out[4])
  *   zs_lzjb(src, slen, dst, dlen) -> bytes produced or -1
+ *   zs_lz4(src, slen, dst, dlen)  -> bytes produced or -1 (src as ZFS stores it: 4-byte big-endian
+ *        length of the LZ4 block, then the block)
  *   zs_read_verify(fd, offset, psize, cksum[4], comp, dst, lsize) -> 0 ok, 1 checksum mismatch,
- *        2 read error, 3 decompression failed, 4 compression not supported
+ *        2 read error, 3 decompression failed, 4 compression not supported (off, lzjb, lz4 are)
  * Own implementation from the public ZFS on-disk format (no CDDL code).
  */
 #define _GNU_SOURCE
@@ -50,6 +52,48 @@ int64_t zs_lzjb(const uint8_t *src, uint64_t slen, uint8_t *dst, uint64_t dlen)
 	return (int64_t)(d - dst);
 }
 
+/* LZ4 block format (lz4 project's "LZ4 Block Format Description"): sequences of
+   token (4 bits literal length, 4 bits match length - 4), literal length extension bytes, literals,
+   2-byte little-endian offset, match length extension bytes. The last sequence has literals only. */
+int64_t zs_lz4(const uint8_t *src, uint64_t slen, uint8_t *dst, uint64_t dlen)
+{
+	if (slen < 4) return -1;
+	uint64_t clen = (uint64_t)src[0] << 24 | (uint64_t)src[1] << 16 | (uint64_t)src[2] << 8 | src[3];
+	if (clen > slen - 4) return -1;
+	const uint8_t *ip = src + 4, *iend = ip + clen;
+	uint8_t *op = dst, *oend = dst + dlen;
+	while (ip < iend) {
+		unsigned token = *ip++, b;
+		uint64_t lit = token >> 4;
+		if (lit == 15)
+			do {
+				if (ip >= iend) return -1;
+				b = *ip++;
+				lit += b;
+			} while (b == 255);
+		if (lit > (uint64_t)(iend - ip) || lit > (uint64_t)(oend - op)) return -1;
+		memcpy(op, ip, lit);
+		op += lit;
+		ip += lit;
+		if (ip == iend) break;
+		if (iend - ip < 2) return -1;
+		uint64_t off = ip[0] | (uint64_t)ip[1] << 8;
+		ip += 2;
+		if (off == 0 || off > (uint64_t)(op - dst)) return -1;
+		uint64_t mlen = (token & 15) + 4;
+		if ((token & 15) == 15)
+			do {
+				if (ip >= iend) return -1;
+				b = *ip++;
+				mlen += b;
+			} while (b == 255);
+		if (mlen > (uint64_t)(oend - op)) return -1;
+		const uint8_t *cpy = op - off;
+		while (mlen--) *op++ = *cpy++;
+	}
+	return (int64_t)(op - dst);
+}
+
 int zs_read_verify(int fd, uint64_t offset, uint64_t psize, const uint64_t ck[4], int comp,
 		   uint8_t *dst, uint64_t lsize)
 {
@@ -69,6 +113,8 @@ int zs_read_verify(int fd, uint64_t offset, uint64_t psize, const uint64_t ck[4]
 		if (zs_lzjb(raw, psize, dst, lsize) != (int64_t)lsize) rc = 3;
 	} else if (comp == 1 || comp == 2 || comp == 3) {          /* off / uncompressed */
 		memcpy(dst, raw, lsize < psize ? lsize : psize);
+	} else if (comp == 15) {                                    /* lz4 */
+		if (zs_lz4(raw, psize, dst, lsize) != (int64_t)lsize) rc = 3;
 	} else {
 		rc = 4;
 	}

@@ -2,8 +2,8 @@
 """Probe the tree-root candidates from finished scan chunks on the recovery host
 (zsread.py batch) and rank the verified states of the target dataset.
 
-- Candidates: L6 blocks (IND child_level=5) plus objset blocks whose L6 block was
-  not found itself. Identical content (same checksum) is probed only once.
+- Candidates: tree-root blocks (IND whose entries are on level levels - 2, e.g. L6 blocks of a 7-level
+  tree) plus objset blocks whose tree root was not found itself. Identical content (same checksum) is probed only once.
 - Order: newest TXG first. Results are appended to status/probed.jsonl.
 - A candidate is a state of the target if its root directory contains one of the
   case's target.root_names.
@@ -23,16 +23,27 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (CANDIDATES, CASE, HOST, PROBE_STATS, PROBED, RAW, TARGET_NAME,
-                    classify, reader_cmd, ssh)
+from common import (CANDIDATES, CASE, HOST, PROBE_STATS, PROBED, RAW, RAWS, TARGET_NAME,
+                    classify, newest_txg, reader_cmd, ssh)
 
 LABEL = CASE.get('profile', {}).get('label_start', 0x400000)
 LEVELS = CASE.get('profile', {}).get('meta_dnode_levels', 7)
 
 
-def candidates(raw=RAW, levels=LEVELS, label=LABEL):
-    """Tree-root candidates from the finished scan chunks in raw (parameters: tests/run.py)."""
-    roots, objsets, seen = {}, [], set()
+def candidates(raw=RAW, levels=LEVELS, label=LABEL, seen=None):
+    """Tree-root candidates from the finished scan chunks in raw (parameters: tests/run.py).
+
+    A file `vdev` in raw names the top-level vdev of the scanned device; offsets of other vdevs than 0
+    are written as '<vdev>:<hex>', which zsread.py understands. `seen` (checksums) can be shared
+    between several scan directories so that identical blocks are probed only once.
+    """
+    roots, objsets = {}, []
+    seen = set() if seen is None else seen
+    vdev = 0
+    if os.path.exists(os.path.join(raw, 'vdev')):
+        with open(os.path.join(raw, 'vdev')) as f:
+            vdev = int(f.read().strip() or 0)
+    pre = f'{vdev}:' if vdev else ''
     for done in sorted(glob.glob(f'{raw}/chunk_*.tsv.gz.done')):
         with gzip.open(done[:-5], 'rt') as f:
             for line in f:
@@ -42,10 +53,10 @@ def candidates(raw=RAW, levels=LEVELS, label=LABEL):
                     if c[5] in seen:
                         continue
                     seen.add(c[5])
-                    roots[c[0]] = ('IND', c[0], c[2], c[3], c[4], int(kv['max_birth']))
+                    roots[pre + c[0]] = ('IND', pre + c[0], c[2], c[3], c[4], int(kv['max_birth']))
                 elif c[1] == 'OBJSET' and kv.get('nlevels') == str(levels):
-                    objsets.append(('OBJSET', c[0], c[2], c[3], c[4], int(kv['bp_birth']),
-                                    f'{int(kv["bp_dva0"], 16) + label:x}', c[5]))
+                    objsets.append(('OBJSET', pre + c[0], c[2], c[3], c[4], int(kv['bp_birth']),
+                                    f'{pre}{int(kv["bp_dva0"], 16) + label:x}', c[5]))
     out = list(roots.values())
     for o in objsets:
         if o[6] not in roots and o[7] not in seen:
@@ -54,19 +65,32 @@ def candidates(raw=RAW, levels=LEVELS, label=LABEL):
     return out
 
 
+def min_birth_during_scan():
+    """While the scan is still reading the disk, only candidates born at or after this TXG are probed.
+
+    Random reads of old states would slow the sequential scan down; the older ones follow once the scan
+    is done. The threshold is the newest TXG of the case minus 20 % of the pool's TXG history (TXGs count
+    from the creation of the pool, so this scales with the pool's age). MIN_BIRTH_DURING_SCAN overrides it;
+    a case without a timeline defers nothing.
+    """
+    if os.environ.get('MIN_BIRTH_DURING_SCAN'):
+        return int(os.environ['MIN_BIRTH_DURING_SCAN'])
+    newest = newest_txg()
+    return newest - newest // 5 if newest else 0
+
+
 def run(limit):
     probed = {}
     if os.path.exists(PROBED):
         for line in open(PROBED):
             r = json.loads(line)
             probed[r['offset']] = r
-    allc = candidates()
+    seen = set()
+    allc = [c for raw in RAWS for c in candidates(raw, seen=seen)]
     by_off = {c[1]: c for c in allc}
     todo = [c for c in allc if c[1] not in probed]
-    # While the scan is still reading the disk, probe only recent candidates: random reads of
-    # old states would slow the sequential scan down. Older ones follow once the scan is done.
     scan_running = ssh('pgrep -x zscan').strip() != ''
-    min_birth = int(os.environ.get('MIN_BIRTH_DURING_SCAN', 700000)) if scan_running else 0
+    min_birth = min_birth_during_scan() if scan_running else 0
     deferred = sum(1 for c in todo if c[5] < min_birth)
     todo = [c for c in todo if c[5] >= min_birth]
     todo.sort(key=lambda c: -c[5])
@@ -99,7 +123,7 @@ def run(limit):
             continue                     # collapse consecutive identical states
         last = sig
         c = by_off.get(r['offset'])
-        table.append({'offset': r['offset'], 'kind': 'L6' if r['kind'] == 'IND' else r['kind'],
+        table.append({'offset': r['offset'], 'kind': f'L{LEVELS - 1}' if r['kind'] == 'IND' else r['kind'],
                       'birth': r['birth'], 'objects': r.get('objects'),
                       'root': ', '.join(r.get('root', [])[:12]) + (' …' if len(r.get('root', [])) > 12 else ''),
                       'status': 'verified ✓',

@@ -35,13 +35,29 @@ TARGET_NAME = TARGET.get('dataset', 'target')
 _scan = CASE.get('scan', {})
 SCAN_DEVICE = _scan.get('device', '')
 RAW = f"{REPO}/{_scan.get('chunk_dir') or 'logs/raw/scan_' + (SCAN_DEVICE or 'device')}"
+# pools with several top-level vdevs: one scan per vdev (scan-device.sh writes the vdev id into each dir)
+RAWS = [f'{REPO}/{d}' for d in _scan.get('chunk_dirs', [])] or [RAW]
 SCAN_LOG = f"{REPO}/{_scan.get('log') or 'logs/scan.log'}"
 
 
+def newest_txg():
+    """Newest TXG in the case's uberblock timeline (0 if the case has none)."""
+    return max((e['txg'] for e in CASE.get('timeline', [])), default=0)
+
+
 def reader_cmd(*args):
-    """Remote command line for zsread.py with the case's devices and label offset."""
-    devs = ':'.join(d['path'] for d in CASE.get('pool', {}).get('devices', []))
-    env = f'ZSREAD_DEVS={shlex.quote(devs)} ' if devs else ''
+    """Remote command line for zsread.py with the case's devices (per top-level vdev, if the case
+    knows them) and label offset."""
+    devices = CASE.get('pool', {}).get('devices', [])
+    if devices and all(d.get('vdev') is not None for d in devices):
+        groups = {}
+        for d in devices:
+            groups.setdefault(d['vdev'], []).append(d['path'])
+        spec = ';'.join(f'{v}={",".join(p)}' for v, p in sorted(groups.items()))
+        env = f'ZSREAD_VDEVS={shlex.quote(spec)} '
+    else:
+        devs = ':'.join(d['path'] for d in devices)
+        env = f'ZSREAD_DEVS={shlex.quote(devs)} ' if devs else ''
     label = CASE.get('profile', {}).get('label_start')
     if label:
         env += f'ZSREAD_LABEL_START={int(label)} '

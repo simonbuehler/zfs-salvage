@@ -1,0 +1,27 @@
+------------------------------------
+LABEL 0 
+------------------------------------
+    version: 5000
+    name: 'fx-legacy-single'
+    state: 1
+    txg: 55
+    pool_guid: 2610811443980062501
+    errata: 0
+    hostid: 206356055
+    hostname: 'ubuntu'
+    top_guid: 7535548202110968112
+    guid: 7535548202110968112
+    vdev_children: 1
+    vdev_tree:
+        type: 'file'
+        id: 0
+        guid: 7535548202110968112
+        path: '/var/tmp/zfs-salvage-fixtures/legacy-single/d0.img'
+        metaslab_array: 256
+        metaslab_shift: 24
+        ashift: 9
+        asize: 129499136
+        is_log: 0
+        create_txg: 4
+    features_for_read:
+    labels = 0 1 2 3 

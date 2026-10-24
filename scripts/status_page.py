@@ -111,7 +111,7 @@ def chain_svg(state):
          'Dataset entry with size, snapshots and the pointer to its objset block'),
         (f'Objset block', f'TXG {brk.get("birth_txg", "?")} · {brk.get("reason", "unreadable")}', 'critical',
          'This is where the chain breaks'),
-        ('Dnode tree L6 → L1', state['tree'][1], state['tree'][0],
+        (f'Dnode tree L{L6_LEVEL + 1} → L1', state['tree'][1], state['tree'][0],
          'Pointer tree to all file entries – the scanner finds it directly on disk'),
         ('File entries (dnodes)', state['dnodes'][1], state['dnodes'][0],
          'Name, size, date, pointers to contents; 32 per 16 KiB block'),
@@ -159,7 +159,7 @@ def disk_map(n, step, done_counts, cur_idx, cur_frac):
             c = done_counts[i]
             tot = sum(c.values()) - c.get('L6', 0)
             k = 0 if tot == 0 else min(len(SEQ) - 1, int(math.log1p(tot) / math.log1p(vmax) * (len(SEQ) - 1) + 0.5))
-            tip = (f'{lo:.0f}–{hi:.0f} GB · scanned · objsets {num(c["OBJSET"])} · L6 {num(c["L6"])} · '
+            tip = (f'{lo:.0f}–{hi:.0f} GB · scanned · objsets {num(c["OBJSET"])} · roots {num(c["L6"])} · '
                    f'indirect blocks {num(c["IND"])} · dnode blocks {num(c["DNODES"])}')
             cells.append(f'<div class="cell" style="background:{SEQ[k]}" title="{html.escape(tip)}"></div>')
         elif i == cur_idx:
@@ -346,11 +346,11 @@ h3{{font-size:14px;margin:14px 0 6px}}
 {chain_svg(chain_state(cands, scanning))}
 <p class="mut">✓ intact and proven by checksum · ✗ destroyed · ⟳ being searched · · not reached yet. TXG = transaction group number, higher is newer.</p></div>
 <details class="card" id="details"><summary>Scan details</summary><div id="det">
-<div class="kpi" style="margin-top:10px"><div>Objset blocks<b>{num(totals["OBJSET"])}</b></div><div>L6 roots<b>{num(totals["L6"])}</b></div>
+<div class="kpi" style="margin-top:10px"><div>Objset blocks<b>{num(totals["OBJSET"])}</b></div><div>Tree roots<b>{num(totals["L6"])}</b></div>
 <div>Indirect blocks<b>{num(totals["IND"])}</b></div><div>Dnode blocks<b>{num(totals["DNODES"])}</b></div></div>
 <h3>Candidates for {ds}</h3><p class="mut">{html.escape(probe_txt)} · newest first, consecutive identical states collapsed</p>
 <div class="wrap"><table><tr><th>Offset</th><th>Kind</th><th>TXG (time)</th><th>Objects</th><th>Top level</th><th>Status</th></tr>{crs}</table></div>
-<h3>Latest chunks</h3><div class="wrap"><table><tr><th>Chunk</th><th>Objsets</th><th>L6</th><th>Indirect</th><th>Dnodes</th></tr>{trs}</table></div>
+<h3>Latest chunks</h3><div class="wrap"><table><tr><th>Chunk</th><th>Objsets</th><th>Roots</th><th>Indirect</th><th>Dnodes</th></tr>{trs}</table></div>
 </div></details>
 </main>
 <script src="/steps.js"></script>

@@ -3,27 +3,42 @@
 
 Runs on the recovery host. Reads blocks via their DVAs from read-only devices,
 verifies every copy against the checksum stored in the block pointer
-(fletcher4), decompresses lzjb and walks meta-dnode -> dnodes -> ZAP/SA.
+(fletcher4), decompresses lzjb and lz4 and walks meta-dnode -> dnodes -> ZAP/SA.
 Uses libzsalvage.so (C) for checksum/decompression when available.
 
-Devices: colon-separated list in ZSREAD_DEVS (the pool's member devices, opened read-only;
-the workstation scripts take them from the case file). Physical offset = DVA offset +
+Devices: ZSREAD_VDEVS="0=/dev/a,/dev/b;1=/dev/c" maps each top-level vdev id to its devices (mirror
+children, or one device); a DVA is then read only from the devices of its vdev. The older
+ZSREAD_DEVS=/dev/a:/dev/b treats all devices as interchangeable (every DVA is tried on each of them).
+The workstation scripts take both from the case file. Physical offset = DVA offset +
 ZSREAD_LABEL_START (default 4 MiB: vdev labels L0/L1 + boot block).
 
 Commands (a candidate is given as: <kind> <dev_offset_hex> <comp> <psize> <lsize>,
-kind = OBJSET or IND (an L6 block, i.e. the root of a meta-dnode tree)):
+kind = OBJSET or IND (the root indirect block of a meta-dnode tree, L6 on a 7-level tree)):
   probe   <candidate>       follow the tree to the root directory and list it
   tree    <candidate>       full listing as TSV: path, type (f/d/l), size, mtime, obj, status
   batch                     candidates on stdin (+ birth), one JSON result line each
   extract <candidate>       'obj<TAB>path' lines on stdin -> tar stream on stdout,
                             manifest lines on stderr
 """
+import hashlib
 import os
 import struct
 import sys
 import time
 
 DEVS = [d for d in os.environ.get('ZSREAD_DEVS', os.environ.get('ZFSREC_DEVS', '')).split(':') if d]
+
+
+def parse_vdevs(spec):
+    """'0=/dev/a,/dev/b;1=/dev/c' -> {0: ['/dev/a', '/dev/b'], 1: ['/dev/c']}"""
+    out = {}
+    for part in filter(None, (x.strip() for x in spec.split(';'))):
+        vid, _, paths = part.partition('=')
+        out[int(vid)] = [p for p in paths.split(',') if p]
+    return out
+
+
+VDEVS = parse_vdevs(os.environ.get('ZSREAD_VDEVS', ''))
 LABEL_START = int(os.environ.get('ZSREAD_LABEL_START', 0x400000))
 
 DMU_OT_DNODE = 10
@@ -84,32 +99,132 @@ def lzjb(src, dlen):
     return bytes(dst)
 
 
+def lz4(raw, dlen):
+    """Pure-Python decoder for ZFS lz4 blocks (fallback when libzsalvage.so is missing): a 4-byte
+    big-endian length of the LZ4 block, then the block (lz4 project's block format description)."""
+    if len(raw) < 4:
+        raise ReadError('lz4: input too short')
+    clen = int.from_bytes(raw[:4], 'big')
+    if clen > len(raw) - 4:
+        raise ReadError('lz4: length header points beyond the block')
+    src, dst, i = raw[4:4 + clen], bytearray(), 0
+    n = len(src)
+    while i < n:
+        token = src[i]
+        i += 1
+        lit = token >> 4
+        if lit == 15:
+            while True:
+                if i >= n:
+                    raise ReadError('lz4: input too short')
+                b = src[i]
+                i += 1
+                lit += b
+                if b != 255:
+                    break
+        if lit > n - i or len(dst) + lit > dlen:
+            raise ReadError('lz4: literals beyond input or output')
+        dst += src[i:i + lit]
+        i += lit
+        if i == n:
+            break
+        if n - i < 2:
+            raise ReadError('lz4: input too short')
+        off = src[i] | src[i + 1] << 8
+        i += 2
+        if off == 0 or off > len(dst):
+            raise ReadError('lz4: invalid back-reference')
+        mlen = (token & 15) + 4
+        if token & 15 == 15:
+            while True:
+                if i >= n:
+                    raise ReadError('lz4: input too short')
+                b = src[i]
+                i += 1
+                mlen += b
+                if b != 255:
+                    break
+        if len(dst) + mlen > dlen:
+            raise ReadError('lz4: output too long')
+        start = len(dst) - off
+        if off >= mlen:
+            dst += dst[start:start + mlen]
+        else:
+            for k in range(mlen):
+                dst.append(dst[start + k])
+    if len(dst) != dlen:
+        raise ReadError(f'lz4: {len(dst)} bytes instead of {dlen}')
+    return bytes(dst)
+
+
+COMP_IDS = {'off': 2, 'lzjb': 3, 'lz4': 15}       # zscan's names -> blkptr compression ids
+
+
 class Dev:
-    def __init__(self, paths=DEVS):
-        self.fds = [os.open(p, os.O_RDONLY) for p in paths if os.path.exists(p)]
+    """The pool's devices. With a vdev map a DVA is read only from the devices of its top-level vdev;
+    without one (a plain device list) every device is tried, as before."""
+
+    def __init__(self, paths=None, vdevs=None):
+        vdevs = VDEVS if vdevs is None and paths is None else (vdevs or {})
+        if vdevs:
+            paths = [p for v in sorted(vdevs) for p in vdevs[v]]
+        elif paths is None:
+            paths = DEVS
+        self.fds, self.by_vdev = [], {}
+        for p in paths:
+            if os.path.exists(p):
+                self.fds.append(os.open(p, os.O_RDONLY))
+                if vdevs:
+                    v = next(v for v in sorted(vdevs) if p in vdevs[v])
+                    self.by_vdev.setdefault(v, []).append(len(self.fds) - 1)
         if not self.fds:
-            sys.exit('zsread: no readable device – set ZSREAD_DEVS=/dev/...:/dev/... (opened read-only)')
+            sys.exit('zsread: no readable device – set ZSREAD_VDEVS or ZSREAD_DEVS (devices opened read-only)')
+        self.strict = bool(vdevs)
         self.stats = {'ok': 0, 'bad_copy': 0, 'fail': 0}
+
+    def for_vdev(self, vdev):
+        """Indexes of the devices that can hold a DVA of this top-level vdev."""
+        return self.by_vdev.get(vdev, []) if self.strict else range(len(self.fds))
+
+    def first(self, vdev):
+        idx = list(self.for_vdev(vdev))
+        if not idx:
+            raise ReadError(f'no device for top-level vdev {vdev}')
+        return idx[0]
 
     def pread(self, idx, off, size):
         return os.pread(self.fds[idx], size, off)
 
 
 class BP:
-    """blkptr_t (128 bytes)."""
-    __slots__ = ('w', 'dvas', 'lsize', 'psize', 'comp', 'cksum_alg', 'type', 'level',
-                 'birth', 'fill', 'cksum', 'embedded', 'gang', 'hole')
+    """blkptr_t (128 bytes).
+
+    Embedded block pointers (feature embedded_data) carry up to 112 bytes of (compressed) data
+    themselves instead of DVAs and a checksum: word 6 holds lsize - 1 (bits 0-24), psize - 1 (bits
+    25-31), compression, the E bit (39), the embedded type (40-47), object type and level; word 10 is the
+    birth TXG; the payload fills words 0-5, 7-9 and 11-15 in that order.
+    """
+    __slots__ = ('w', 'raw', 'dvas', 'lsize', 'psize', 'comp', 'cksum_alg', 'type', 'level',
+                 'birth', 'fill', 'cksum', 'embedded', 'etype', 'gang', 'hole')
 
     def __init__(self, raw):
         w = struct.unpack('<16Q', raw)
         self.w = w
+        self.raw = bytes(raw)
         self.hole = not any(w)
         prop = w[6]
         self.embedded = bool((prop >> 39) & 1)
-        self.lsize = ((prop & 0xffff) + 1) << 9
-        self.psize = (((prop >> 16) & 0xffff) + 1) << 9
         self.comp = (prop >> 32) & 0x7f
-        self.cksum_alg = (prop >> 40) & 0xff
+        if self.embedded:
+            self.lsize = (prop & 0x1ffffff) + 1
+            self.psize = ((prop >> 25) & 0x7f) + 1
+            self.etype = (prop >> 40) & 0xff
+            self.cksum_alg = None
+        else:
+            self.lsize = ((prop & 0xffff) + 1) << 9
+            self.psize = (((prop >> 16) & 0xffff) + 1) << 9
+            self.etype = None
+            self.cksum_alg = (prop >> 40) & 0xff
         self.type = (prop >> 48) & 0xff
         self.level = (prop >> 56) & 0x1f
         self.birth = w[10]
@@ -117,7 +232,7 @@ class BP:
         self.cksum = tuple(w[12:16])
         self.dvas = []
         self.gang = False
-        for k in range(3):
+        for k in range(0 if self.embedded else 3):
             w0, w1 = w[2 * k], w[2 * k + 1]
             asize = (w0 & 0xffffff) << 9
             if asize:
@@ -130,6 +245,24 @@ class BP:
                 f'birth={self.birth} fill={self.fill}')
 
 
+def embedded_payload(bp):
+    """The (still compressed) data of an embedded block pointer."""
+    return b''.join(bp.raw[8 * i:8 * i + 8] for i in (0, 1, 2, 3, 4, 5, 7, 8, 9, 11, 12, 13, 14, 15))[:bp.psize]
+
+
+def read_embedded(bp):
+    if bp.etype != 0:
+        raise ReadError(f'embedded block pointer of type {bp.etype} (only data, type 0, is supported)')
+    raw = embedded_payload(bp)
+    if bp.comp == 15:
+        return lz4(raw, bp.lsize)
+    if bp.comp in (1, 3) and bp.psize != bp.lsize:
+        return lzjb(raw, bp.lsize)
+    if bp.comp in (1, 2, 3) and bp.psize == bp.lsize:
+        return raw
+    raise ReadError(f'embedded block pointer with compression {bp.comp} not supported')
+
+
 def _load_lib():
     import ctypes
     for p in (os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libzsalvage.so'),
@@ -139,6 +272,13 @@ def _load_lib():
             lib.zs_read_verify.argtypes = [ctypes.c_int, ctypes.c_uint64, ctypes.c_uint64,
                                            ctypes.POINTER(ctypes.c_uint64), ctypes.c_int,
                                            ctypes.c_char_p, ctypes.c_uint64]
+            lib.zs_fletcher4.argtypes = [ctypes.c_char_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint64)]
+            lib.zs_fletcher4.restype = None
+            for name in ('zs_lzjb', 'zs_lz4'):          # zs_lz4 is missing in builds from before lz4 support
+                f = getattr(lib, name, None)
+                if f is not None:
+                    f.argtypes = [ctypes.c_char_p, ctypes.c_uint64, ctypes.c_char_p, ctypes.c_uint64]
+                    f.restype = ctypes.c_int64
             return lib, ctypes
     return None, None
 
@@ -146,56 +286,104 @@ def _load_lib():
 LIB, CT = _load_lib()
 
 
+def checksum(alg, raw):
+    """The checksum words ZFS stores in a block pointer: fletcher4 (7) or sha256 (8), else None."""
+    if alg == 7:
+        if LIB is not None:
+            out = (CT.c_uint64 * 4)()
+            LIB.zs_fletcher4(raw, len(raw), out)
+            return tuple(out)
+        return fletcher4(raw)
+    if alg == 8:
+        d = hashlib.sha256(raw).digest()
+        return tuple(int.from_bytes(d[8 * i:8 * i + 8], 'big') for i in range(4))   # 4 big-endian words
+    return None
+
+
+def decompress(raw, comp, lsize):
+    """A verified block's data: comp is the block pointer's compression id (2 off, 3 lzjb, 15 lz4)."""
+    if comp == 15:
+        f = getattr(LIB, 'zs_lz4', None) if LIB is not None else None
+        if f is None:
+            return lz4(raw, lsize)
+        buf = CT.create_string_buffer(lsize)
+        if f(raw, len(raw), buf, lsize) != lsize:
+            raise ReadError('lz4: block does not decode to its logical size')
+        return buf.raw
+    if comp in (1, 3) and len(raw) != lsize:
+        return lzjb(raw, lsize)
+    if comp in (1, 2, 3):
+        return raw[:lsize]
+    raise ReadError(f'compression {comp} not supported')
+
+
 def read_bp(dev, bp):
     """Read and verify a block; returns its lsize decompressed bytes.
 
-    Tries every DVA on every device until one copy matches the checksum.
+    Tries every DVA on every device until one copy matches the checksum. Blocks whose checksum
+    algorithm is not supported are refused: nothing is used without proof.
     """
     if bp.hole:
         return bytes(bp.lsize)
     if bp.embedded:
-        raise ReadError('embedded block pointer not supported')
+        return read_embedded(bp)        # no checksum of its own: the parent block was verified
     if bp.gang:
         raise ReadError('gang block not supported')
-    if LIB is not None and bp.cksum_alg in (7, 1, 2):
+    if bp.cksum_alg not in (7, 8):
+        # 2 = off, 6 = fletcher2, 11+ = sha512/skein/edonr/blake3
+        raise ReadError(f'checksum algorithm {bp.cksum_alg} not supported, block cannot be verified')
+    errors = []
+    if LIB is not None and bp.cksum_alg == 7:
         ck = (CT.c_uint64 * 4)(*bp.cksum)
         buf = CT.create_string_buffer(bp.lsize)
-        errors = []
+        unsupported = False
         for vdev, off, asize in bp.dvas:
-            for di in range(len(dev.fds)):
+            for di in dev.for_vdev(vdev):
                 rc = LIB.zs_read_verify(dev.fds[di], LABEL_START + off, bp.psize, ck, bp.comp, buf, bp.lsize)
                 if rc == 0:
                     dev.stats['ok'] += 1
                     return buf.raw
                 if rc == 1:
                     dev.stats['bad_copy'] += 1
+                unsupported |= rc == 4
                 errors.append(f'rc{rc}@{off:x}/{di}')
-        dev.stats['fail'] += 1
-        raise ReadError('no valid copy: ' + ','.join(errors))
-    errors = []
+        if not unsupported:                 # rc 4: an older library without this compression
+            dev.stats['fail'] += 1
+            raise ReadError('no valid copy: ' + ','.join(errors))
     for vdev, off, asize in bp.dvas:
-        for di in range(len(dev.fds)):
+        if not list(dev.for_vdev(vdev)):
+            errors.append(f'no device for vdev {vdev}')
+        for di in dev.for_vdev(vdev):
             raw = dev.pread(di, LABEL_START + off, bp.psize)
             if len(raw) != bp.psize:
                 errors.append(f'short@{off:x}/{di}')
                 continue
-            if bp.cksum_alg in (7, 1, 2) and fletcher4(raw) != bp.cksum:
+            if checksum(bp.cksum_alg, raw) != bp.cksum:
                 dev.stats['bad_copy'] += 1
                 errors.append(f'cksum@{off:x}/{di}')
                 continue
             dev.stats['ok'] += 1
-            if bp.comp in (1, 3) and bp.psize != bp.lsize:
-                return lzjb(raw, bp.lsize)
-            if bp.comp in (1, 2, 3):
-                return raw
-            raise ReadError(f'compression {bp.comp} not supported')
+            return decompress(raw, bp.comp, bp.lsize)
     dev.stats['fail'] += 1
     raise ReadError('no valid copy: ' + ','.join(errors))
 
 
+def child_level(data):
+    """Level of the block pointers in an indirect block (the block itself is one level higher)."""
+    for i in range(len(data) // 128):
+        bp = BP(data[128 * i:128 * (i + 1)])
+        if not bp.hole:
+            return bp.level
+    raise ReadError('indirect block without block pointers')
+
+
 def read_raw_candidate(dev, off, comp, psize, lsize, disk=0):
     raw = dev.pread(disk, off, psize)
-    return lzjb(raw, lsize) if comp == 'lzjb' else raw[:lsize]
+    if comp == 'lzjb':
+        return lzjb(raw, lsize)
+    if comp == 'lz4':
+        return lz4(raw, lsize)
+    return raw[:lsize]
 
 
 # ---------------------------------------------------------------- dnodes
@@ -242,7 +430,7 @@ class Dnode:
 
 
 class Objset:
-    """A dataset, given by its meta-dnode (from an objset block or an L6 block)."""
+    """A dataset, given by its meta-dnode (from an objset block or a tree root block)."""
 
     def __init__(self, dev, meta):
         self.dev = dev
@@ -262,10 +450,11 @@ def meta_from_objset_block(data):
     return Dnode(data[:512])
 
 
-def meta_from_l6_block(bp_raw):
-    """Synthetic 7-level meta-dnode whose only block pointer points to the given L6 block."""
+def meta_from_root_block(bp_raw, nlevels, indblkshift):
+    """Synthetic meta-dnode with nlevels levels and indirect blocks of 2**indblkshift bytes whose only
+    block pointer points to the given tree root block."""
     dn = bytearray(512)
-    struct.pack_into('<8B', dn, 0, DMU_OT_DNODE, 14, 7, 1, 0, 7, 3, 0)
+    struct.pack_into('<8B', dn, 0, DMU_OT_DNODE, indblkshift, nlevels, 1, 0, 7, 3, 0)
     struct.pack_into('<HH', dn, 8, 32, 0)
     struct.pack_into('<Q', dn, 16, (1 << 40))
     dn[64:192] = bp_raw
@@ -390,25 +579,36 @@ class ZPL:
 
 
 # ---------------------------------------------------------------- commands
-def open_candidate(dev, kind, off, comp, psize, lsize):
-    data = read_raw_candidate(dev, off, comp, psize, lsize)
+def open_candidate(dev, kind, off, comp, psize, lsize, vdev=0):
+    disk = dev.first(vdev)
+    data = read_raw_candidate(dev, off, comp, psize, lsize, disk)
     if kind == 'OBJSET':
         return Objset(dev, meta_from_objset_block(data))
     if kind == 'IND':
-        # synthetic block pointer to the L6 block at this offset (checksum = its own fletcher4)
+        # synthetic block pointer to the tree root at this offset (checksum = its own fletcher4);
+        # tree height and indirect block size follow from the block itself
+        level = child_level(data) + 1
         bp = bytearray(128)
-        struct.pack_into('<QQ', bp, 0, psize // 512, (off - LABEL_START) // 512)
-        prop = ((lsize // 512 - 1) | ((psize // 512 - 1) << 16) | ((3 if comp == 'lzjb' else 2) << 32)
-                | (7 << 40) | (DMU_OT_DNODE << 48) | (6 << 56))
+        struct.pack_into('<QQ', bp, 0, psize // 512 | vdev << 32, (off - LABEL_START) // 512)
+        prop = ((lsize // 512 - 1) | ((psize // 512 - 1) << 16) | (COMP_IDS[comp] << 32)
+                | (7 << 40) | (DMU_OT_DNODE << 48) | (level << 56))
         struct.pack_into('<Q', bp, 48, prop)
         struct.pack_into('<Q', bp, 80, 1)
-        struct.pack_into('<4Q', bp, 96, *fletcher4(dev.pread(0, off, psize)))
-        return Objset(dev, meta_from_l6_block(bytes(bp)))
+        struct.pack_into('<4Q', bp, 96, *fletcher4(dev.pread(disk, off, psize)))
+        return Objset(dev, meta_from_root_block(bytes(bp), level + 1, lsize.bit_length() - 1))
     raise SystemExit(f'unknown candidate kind {kind}')
 
 
+def parse_offset(text):
+    """'<hex>' (top-level vdev 0) or '<vdev>:<hex>' -> (vdev, byte offset on that vdev's device)"""
+    v, _, h = text.rpartition(':')
+    return (int(v) if v else 0), int(h, 16)
+
+
 def parse_candidate(args):
-    return args[0], int(args[1], 16), args[2], int(args[3]), int(args[4])
+    """kind, offset, comp, psize, lsize, vdev from '<kind> [<vdev>:]<hex offset> <comp> <psize> <lsize>'"""
+    vdev, off = parse_offset(args[1])
+    return args[0], off, args[2], int(args[3]), int(args[4]), vdev
 
 
 def fmt_time(t):
@@ -481,15 +681,16 @@ def cmd_batch(args):
         f = line.split()
         if len(f) < 6:
             continue
-        kind, off, comp, psize, lsize, birth = f[0], int(f[1], 16), f[2], int(f[3]), int(f[4]), int(f[5])
-        res = {'offset': f'{off:x}', 'kind': kind, 'birth': birth}
+        kind, comp, psize, lsize, birth = f[0], f[2], int(f[3]), int(f[4]), int(f[5])
+        vdev, off = parse_offset(f[1])
+        res = {'offset': f[1], 'kind': kind, 'birth': birth}
         signal.alarm(30)
         t0 = time.time()
         try:
-            os_ = open_candidate(dev, kind, off, comp, psize, lsize)
+            os_ = open_candidate(dev, kind, off, comp, psize, lsize, vdev)
             if kind == 'IND':
-                data = read_raw_candidate(dev, off, comp, psize, lsize)
-                res['objects'] = sum(BP(data[128 * i:128 * (i + 1)]).fill for i in range(128))
+                data = read_raw_candidate(dev, off, comp, psize, lsize, dev.first(vdev))
+                res['objects'] = sum(BP(data[128 * i:128 * (i + 1)]).fill for i in range(len(data) // 128))
             else:
                 res['objects'] = os_.meta.bps[0].fill
             z = ZPL(os_)

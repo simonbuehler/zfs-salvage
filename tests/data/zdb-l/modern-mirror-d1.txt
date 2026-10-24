@@ -1,0 +1,41 @@
+------------------------------------
+LABEL 0 
+------------------------------------
+    version: 5000
+    name: 'fx-modern-mirror'
+    state: 1
+    txg: 58
+    pool_guid: 11419294873098188086
+    errata: 0
+    hostid: 206356055
+    hostname: 'ubuntu'
+    top_guid: 3489721937244974110
+    guid: 7724845332000183821
+    vdev_children: 1
+    vdev_tree:
+        type: 'mirror'
+        id: 0
+        guid: 3489721937244974110
+        metaslab_array: 138
+        metaslab_shift: 24
+        ashift: 12
+        asize: 129499136
+        is_log: 0
+        create_txg: 4
+        children[0]:
+            type: 'file'
+            id: 0
+            guid: 7389885687357607083
+            path: '/var/tmp/zfs-salvage-fixtures/modern-mirror/d0.img'
+            create_txg: 4
+        children[1]:
+            type: 'file'
+            id: 1
+            guid: 7724845332000183821
+            path: '/var/tmp/zfs-salvage-fixtures/modern-mirror/d1.img'
+            create_txg: 4
+    features_for_read:
+        com.delphix:hole_birth
+        com.delphix:embedded_data
+        com.klarasystems:vdev_zaps_v2
+    labels = 0 1 2 3 

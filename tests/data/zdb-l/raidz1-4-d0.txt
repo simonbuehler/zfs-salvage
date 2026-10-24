@@ -1,0 +1,54 @@
+------------------------------------
+LABEL 0 
+------------------------------------
+    version: 5000
+    name: 'fx-raidz1-4'
+    state: 1
+    txg: 29
+    pool_guid: 5534529580256021759
+    errata: 0
+    hostid: 206356055
+    hostname: 'ubuntu'
+    top_guid: 886861361629888836
+    guid: 2862595871564494047
+    vdev_children: 1
+    vdev_tree:
+        type: 'raidz'
+        id: 0
+        guid: 886861361629888836
+        nparity: 1
+        metaslab_array: 135
+        metaslab_shift: 25
+        ashift: 12
+        asize: 517996544
+        is_log: 0
+        create_txg: 4
+        children[0]:
+            type: 'file'
+            id: 0
+            guid: 2862595871564494047
+            path: '/var/tmp/zfs-salvage-fixtures/raidz1-4/d0.img'
+            create_txg: 4
+        children[1]:
+            type: 'file'
+            id: 1
+            guid: 17849576244648254711
+            path: '/var/tmp/zfs-salvage-fixtures/raidz1-4/d1.img'
+            create_txg: 4
+        children[2]:
+            type: 'file'
+            id: 2
+            guid: 8981525647117868697
+            path: '/var/tmp/zfs-salvage-fixtures/raidz1-4/d2.img'
+            create_txg: 4
+        children[3]:
+            type: 'file'
+            id: 3
+            guid: 9504463977466398127
+            path: '/var/tmp/zfs-salvage-fixtures/raidz1-4/d3.img'
+            create_txg: 4
+    features_for_read:
+        com.delphix:hole_birth
+        com.delphix:embedded_data
+        com.klarasystems:vdev_zaps_v2
+    labels = 0 1 2 3 

@@ -68,6 +68,16 @@ def find_devices():
     return devs
 
 
+def vdev_groups(labels):
+    """Top-level vdevs of the given devices: [{'id', 'type', 'devices'}], from their labels."""
+    groups = {}
+    for l in labels:
+        if l.get('top_id') is not None:
+            g = groups.setdefault(l['top_id'], {'id': l['top_id'], 'type': l.get('top_type'), 'devices': []})
+            g['devices'].append(l['device'])
+    return [groups[k] for k in sorted(groups)]
+
+
 def read_label(zdb, dev):
     out = sh([zdb, '-l', dev])
     lab = {'device': dev}
@@ -76,6 +86,8 @@ def read_label(zdb, dev):
     for key in ('pool_guid', 'txg', 'guid', 'top_guid', 'ashift', 'version', 'vdev_children'):
         m = re.search(rf'^\s+{key}: (\d+)', out, re.M)
         lab[key] = int(m.group(1)) if m else None
+    m = re.search(r"^\s+vdev_tree:\n\s+type: '([^']+)'\n\s+id: (\d+)", out, re.M)
+    lab['top_type'], lab['top_id'] = (m.group(1), int(m.group(2))) if m else (None, None)   # top-level vdev
     types = re.findall(r"^\s+type: '([^']+)'", out, re.M)
     lab['vdev_types'] = types
     lab['children_paths'] = re.findall(r"^\s+path: '([^']+)'", out, re.M)
@@ -252,15 +264,20 @@ def main():
         'pool': {'name': pool, 'guid': lab['pool_guid'], 'topology': topo, 'ashift': lab['ashift'],
                  'top_level_vdevs': lab['vdev_children'], 'version': lab['version'],
                  'features_for_read': lab['features_for_read'],
-                 'devices': [{'path': l['device'], 'vdev_guid': l.get('guid')} for l in labels]},
+                 'devices': [{'path': l['device'], 'vdev_guid': l.get('guid'), 'vdev': l.get('top_id')}
+                             for l in labels],
+                 'vdevs': vdev_groups(labels)},
         'profile': prof,
         'timeline': [{'txg': t, 'time': ts} for t, ts in ubs],
         'open_txg': txg, 'datasets': datasets,
         'target': {'dataset': target, 'root_names': [x for x in names.split(',') if x]},
         'compatibility': [{'what': k, 'value': v, 'hint': h} for k, v, h in issues],
-        # scan-device.sh writes here by default; smart_disks (e.g. ["sda"]) adds temperatures to the status page
-        'scan': {'device': os.path.basename(labels[0]['device']), 'chunk_dir': f'logs/raw/scan_{os.path.basename(labels[0]['device'])}',
-                 'log': f'logs/scan_{os.path.basename(labels[0]['device'])}.log'},
+        # scan-device.sh writes here by default (one scan per top-level vdev); smart_disks (e.g. ["sda"])
+        # adds temperatures to the status page
+        'scan': {'device': os.path.basename(labels[0]['device']),
+                 'chunk_dir': f"logs/raw/scan_{os.path.basename(labels[0]['device'])}",
+                 'chunk_dirs': [f"logs/raw/scan_{os.path.basename(v['devices'][0])}" for v in vdev_groups(labels)],
+                 'log': f"logs/scan_{os.path.basename(labels[0]['device'])}.log"},
         'smart_disks': [],
     }
     os.makedirs(a.out, exist_ok=True)

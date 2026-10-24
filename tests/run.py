@@ -38,24 +38,14 @@ _spec.loader.exec_module(rank_trees)
 # Expected failures: variant -> (block that makes it pass, why). Applies to <variant> and
 # <variant>-damaged. An entry that passes is reported as XPASS and counts as a failure, so the
 # table has to be updated in the same commit that fixes the behaviour.
-_LZ4 = 'lz4-compressed metadata (comp 15) and 128 KiB indirect blocks are not recognised yet'
 XFAIL = {
-    'legacy-single': ('planned', 'zscan takes the first 16 KiB of a 128 KiB indirect block for a whole block'),
-    'modern-single': ('planned', _LZ4),
-    'modern-mirror': ('planned', _LZ4),
-    'modern-sha256': ('planned', _LZ4 + '; sha256 checksums'),
-    'modern-stripe': ('planned', _LZ4 + '; several top-level vdevs'),
-    'modern-twodatasets': ('planned', _LZ4),
-    'modern-deleted': ('planned', _LZ4),
-    'modern-destroyed': ('planned', _LZ4),
     'modern-zvol': ('planned', 'zvol export'),
     'modern-offset': ('planned', 'pool does not start at offset 0 of the file'),
     'raidz1-4': ('planned', 'raidz is not supported'),
     'raidz2-5': ('planned', 'raidz is not supported'),
     'raidz1-4-missing': ('planned', 'raidz with a missing disk'),
     'unsupported-encrypted': ('never', 'native encryption is refused by make-case'),
-    'unsupported-largednode': ('planned', 'large dnodes (backlog); refused by make-case'),
-    'unsupported-special': ('never', 'metadata on the missing special vdev; refused by make-case'),
+    'unsupported-special-missing': ('never', 'metadata on the missing special vdev; refused'),
 }
 
 
@@ -68,8 +58,34 @@ def log(verbose, msg):
         print(f'    {msg}', file=sys.stderr, flush=True)
 
 
-def zsread(zsdir, args, devs, label, stdin=b'', timeout=900):
-    env = dict(os.environ, ZSREAD_DEVS=':'.join(devs), ZSREAD_LABEL_START=str(label), LC_ALL='C.UTF-8')
+def vdev_map(side, paths):
+    """Top-level vdev id -> device files, from the `zpool create` arguments in the sidecar
+    (`mirror`/`raidz*` start a group, every other device is a top-level vdev of its own)."""
+    toks, spec, i = side['create'], [], 0
+    while i < len(toks):
+        if toks[i] in ('-o', '-O'):
+            i += 2
+            continue
+        if not toks[i].startswith('-'):
+            spec.append(toks[i])
+        i += 1
+    groups, cur = [], None
+    for t in spec:
+        if t == 'mirror' or t.startswith('raidz'):
+            cur = []
+            groups.append(cur)
+        elif t in ('special', 'log', 'dedup'):          # allocation class: the next device is a new vdev
+            cur = None
+        elif cur is not None:
+            cur.append(paths[int(t)])
+        else:
+            groups.append([paths[int(t)]])
+    return dict(enumerate(groups))
+
+
+def zsread(zsdir, args, vdevs, label, stdin=b'', timeout=900):
+    spec = ';'.join(f'{v}={",".join(p)}' for v, p in sorted(vdevs.items()) if p)
+    env = dict(os.environ, ZSREAD_VDEVS=spec, ZSREAD_LABEL_START=str(label), LC_ALL='C.UTF-8')
     r = subprocess.run(['python3', '-I', os.path.join(zsdir, 'zsread.py'), *args], input=stdin, env=env,
                        capture_output=True, timeout=timeout)
     return r.returncode, r.stdout, r.stderr.decode('utf-8', 'replace')
@@ -84,13 +100,15 @@ def prepare_zsread(use_lib):
     return d
 
 
-def scan(dev, work):
+def scan(dev, work, vdev=0, max_vdev=0):
     """Run zscan; write its finds as a scan chunk like scan-device.sh does. Returns the finds."""
-    r = subprocess.run([fx.ZSCAN, dev], capture_output=True, text=True)
+    r = subprocess.run([fx.ZSCAN, '--max-vdev', str(max_vdev), dev], capture_output=True, text=True)
     if r.returncode:
         raise Fail(f'zscan exited {r.returncode}: {r.stderr.strip()[-200:]}')
-    raw = os.path.join(work, 'raw')
+    raw = os.path.join(work, f'raw{vdev}')
     os.makedirs(raw)
+    with open(os.path.join(raw, 'vdev'), 'w') as f:
+        f.write(str(vdev))
     with gzip.open(os.path.join(raw, 'chunk_0000.tsv.gz'), 'wt') as f:
         f.write(r.stdout)
     open(os.path.join(raw, 'chunk_0000.tsv.gz.done'), 'w').close()
@@ -120,26 +138,31 @@ def pipeline(base, damaged, zsdir, verbose, derived=None):
         devs = fx.unpack(base, work)
         if damaged:
             fx.damage(work, base)
+        vdevs = vdev_map(side, devs)
         if derived and 'embed_offset' in derived:                 # the pool starts inside a larger file
             big = os.path.join(work, 'embedded.img')
             with open(big, 'wb') as out, open(devs[0], 'rb') as src:
                 out.seek(derived['embed_offset'])
                 shutil.copyfileobj(src, out)
-            devs = [big]
+            vdevs = {v: [big if p == devs[0] else p for p in g] for v, g in vdevs.items()}
         if derived and 'omit' in derived:
-            devs = [d for d in devs if os.path.basename(d) not in derived['omit']]
+            vdevs = {v: [p for p in g if os.path.basename(p) not in derived['omit']] for v, g in vdevs.items()}
         label = side['label_start']
         levels = (side.get('meta_dnode') or side.get('destroyed_meta') or {}).get('nlevels', 7)
 
-        raw, finds = scan(devs[0], work)        # scan every vdev once zsread knows device indexes
-        log(verbose, describe_finds(finds))
-        cands = rank_trees.candidates(raw, levels, label)
+        cands, finds, seen = [], [], set()
+        for v, group in sorted(vdevs.items()):                   # one scan per top-level vdev
+            if group:
+                raw, f = scan(group[0], work, v, max(vdevs))
+                finds += f
+                cands += rank_trees.candidates(raw, levels, label, seen)
+        log(verbose, f'{len(vdevs)} top-level vdev(s); ' + describe_finds(finds))
         if not cands:
             raise Fail(f'no tree-root candidate for {levels} levels: {describe_finds(finds)}')
         log(verbose, f'{len(cands)} candidates')
 
         inp = ''.join(f'{k} {o} {cp} {ps} {ls} {b}\n' for k, o, cp, ps, ls, b in cands).encode()
-        rc, out, err = zsread(zsdir, ['batch'], devs, label, inp)
+        rc, out, err = zsread(zsdir, ['batch'], vdevs, label, inp)
         results = [json.loads(l) for l in out.decode('utf-8', 'replace').splitlines() if l.startswith('{')]
         okay = [r for r in results if r.get('ok')]
         if not okay:
@@ -156,7 +179,7 @@ def pipeline(base, damaged, zsdir, verbose, derived=None):
         state = f'state {best["kind"]} birth {best["birth"]}, {best.get("objects")} objects'
         log(verbose, f'{state} @{best["offset"]}')
 
-        rc, out, err = zsread(zsdir, ['tree', *carg], devs, label)
+        rc, out, err = zsread(zsdir, ['tree', *carg], vdevs, label)
         tree = {}
         for line in out.decode('utf-8', 'surrogateescape').splitlines():
             c = line.split('\t')
@@ -172,7 +195,7 @@ def pipeline(base, damaged, zsdir, verbose, derived=None):
             raise Fail(f'{len(wrong)} entries with a wrong size in the tree, e.g. {wrong[0]}')
 
         lines = ''.join(f'{tree[f["path"]][4]}\t{f["path"]}\n' for f in want).encode('utf-8', 'surrogateescape')
-        rc, tar_bytes, err = zsread(zsdir, ['extract', *carg], devs, label, lines)
+        rc, tar_bytes, err = zsread(zsdir, ['extract', *carg], vdevs, label, lines)
         tar_path = os.path.join(work, 'out.tar')
         with open(tar_path, 'wb') as f:
             f.write(tar_bytes)

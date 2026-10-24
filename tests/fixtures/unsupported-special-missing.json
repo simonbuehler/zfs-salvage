@@ -1,0 +1,8 @@
+{
+ "variant": "unsupported-special-missing",
+ "base": "unsupported-special",
+ "omit": [
+  "d1.img"
+ ],
+ "purpose": "special vdev (metadata) missing: clear refusal"
+}

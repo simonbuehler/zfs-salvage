@@ -1,0 +1,30 @@
+------------------------------------
+LABEL 0 
+------------------------------------
+    version: 5000
+    name: 'fx-modern-stripe'
+    state: 1
+    txg: 37
+    pool_guid: 17704021105914508855
+    errata: 0
+    hostid: 206356055
+    hostname: 'ubuntu'
+    top_guid: 8134226454869166769
+    guid: 8134226454869166769
+    vdev_children: 2
+    vdev_tree:
+        type: 'file'
+        id: 0
+        guid: 8134226454869166769
+        path: '/var/tmp/zfs-salvage-fixtures/modern-stripe/d0.img'
+        metaslab_array: 140
+        metaslab_shift: 24
+        ashift: 12
+        asize: 129499136
+        is_log: 0
+        create_txg: 4
+    features_for_read:
+        com.delphix:hole_birth
+        com.delphix:embedded_data
+        com.klarasystems:vdev_zaps_v2
+    labels = 0 1 2 3 

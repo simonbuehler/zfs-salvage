@@ -1,0 +1,30 @@
+------------------------------------
+LABEL 0 
+------------------------------------
+    version: 5000
+    name: 'fx-unsupported-special'
+    state: 1
+    txg: 57
+    pool_guid: 11796691527863218108
+    errata: 0
+    hostid: 206356055
+    hostname: 'ubuntu'
+    top_guid: 5722825390118342707
+    guid: 5722825390118342707
+    vdev_children: 2
+    vdev_tree:
+        type: 'file'
+        id: 1
+        guid: 5722825390118342707
+        path: '/var/tmp/zfs-salvage-fixtures/unsupported-special/d1.img'
+        metaslab_array: 71
+        metaslab_shift: 24
+        ashift: 12
+        asize: 129499136
+        is_log: 0
+        create_txg: 4
+    features_for_read:
+        com.delphix:hole_birth
+        com.delphix:embedded_data
+        com.klarasystems:vdev_zaps_v2
+    labels = 0 1 2 3 
