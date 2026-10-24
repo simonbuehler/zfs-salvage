@@ -80,7 +80,7 @@ class StatusPage(unittest.TestCase):
     def test_scan_error_line_is_shown(self):
         with open(EXAMPLE_CASE) as f:
             case = json.load(f)
-        log_rel = os.path.relpath(os.path.join(self.state, 'scan.log'), fx.REPO)
+        log_rel = os.path.join(self.state, 'scan.log')
         case['scan']['log'] = log_rel
         path = os.path.join(self.state, 'case.json')
         with open(path, 'w') as f:
@@ -186,7 +186,7 @@ class SlowModeChain(unittest.TestCase):
                 'profile': {'label_start': self.side['label_start'], 'meta_dnode_levels': 6,
                             'compression': [], 'checksum': []},
                 'timeline': [{'txg': 100, 'time': 1}], 'target': {'dataset': 'p/home', 'root_names': ['docs']},
-                'scan': {'device': 'd0', 'chunk_dir': os.path.relpath(raw, fx.REPO), 'log': 'x.log'}}
+                'scan': {'device': 'd0', 'chunk_dir': raw, 'log': 'x.log'}}
         cpath = os.path.join(self.dir, 'case.json')
         with open(cpath, 'w') as f:
             json.dump(case, f)

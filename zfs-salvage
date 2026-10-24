@@ -1,0 +1,49 @@
+#!/bin/bash
+# zfs-salvage launcher.   sudo ./zfs-salvage          check this machine, start the web UI, open the browser
+#                         ./zfs-salvage doctor        only the checks (also: --json, --no-root)
+#                         ./zfs-salvage web           only the web UI (no checks, no browser)
+#                         ./zfs-salvage version | bundle-info
+# All results (scan chunks, catalog, status, case files) go to ./data next to this script.
+set -uo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+export ZFS_SALVAGE_STATE_DIR="${ZFS_SALVAGE_STATE_DIR:-$ROOT/data}"
+export ZFS_SALVAGE_CATALOG_DIR="${ZFS_SALVAGE_CATALOG_DIR:-$ZFS_SALVAGE_STATE_DIR/catalog}"
+export ZFS_SALVAGE_CASES_DIR="${ZFS_SALVAGE_CASES_DIR:-$ZFS_SALVAGE_STATE_DIR/cases}"
+PORT="${SALVAGE_UI_PORT:-8765}"
+URL="http://localhost:$PORT/"
+
+version() { cat "$ROOT/VERSION" 2>/dev/null || git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || echo unknown; }
+
+case "${1:-start}" in
+    version) echo "zfs-salvage $(version)" ;;
+    bundle-info)
+        echo "zfs-salvage $(version)"
+        echo "folder:       $ROOT"
+        echo "data:         $ZFS_SALVAGE_STATE_DIR"
+        echo "python:       $(python3 --version 2>&1)"
+        for f in tools/zscan/zscan tools/libzsalvage/libzsalvage.so scripts/zsread.py; do
+            [ -e "$ROOT/$f" ] && echo "included:     $f" || echo "MISSING:      $f"
+        done
+        ;;
+    doctor) shift; mkdir -p "$ZFS_SALVAGE_STATE_DIR"; exec python3 -I "$ROOT/scripts/doctor.py" "$@" ;;
+    web) mkdir -p "$ZFS_SALVAGE_CATALOG_DIR" "$ZFS_SALVAGE_CASES_DIR"; exec python3 -I "$ROOT/scripts/web.py" ;;
+    start)
+        if [ "$(id -u)" != 0 ]; then
+            echo "run with sudo:  sudo ./zfs-salvage     (reading the pool's devices needs root)"
+            echo "(only looking around? ./zfs-salvage doctor --no-root)"
+            exit 1
+        fi
+        mkdir -p "$ZFS_SALVAGE_CATALOG_DIR" "$ZFS_SALVAGE_CASES_DIR"
+        python3 -I "$ROOT/scripts/doctor.py" || { echo; echo "Not starting: fix the problems above and run again."; exit 1; }
+        echo
+        if [ -n "${SUDO_USER:-}" ]; then      # open the browser as the desktop user, not as root; best effort
+            ( for _ in $(seq 1 40); do curl -s -o /dev/null "$URL" 2>/dev/null && break; sleep 0.5; done
+              sudo -u "$SUDO_USER" env DISPLAY="${DISPLAY:-:0}" XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+                  xdg-open "$URL" >/dev/null 2>&1 || echo "open $URL in your browser" ) &
+        fi
+        echo "zfs-salvage $(version): $URL   (Ctrl+C to stop)"
+        exec python3 -I "$ROOT/scripts/web.py"
+        ;;
+    -h|--help|help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *) echo "unknown command: $1 (try --help)"; exit 2 ;;
+esac

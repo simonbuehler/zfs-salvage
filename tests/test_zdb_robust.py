@@ -119,7 +119,7 @@ class ProfileFromTree(unittest.TestCase):
         case = {'name': 't', 'pool': {'name': 'p', 'devices': [{'path': self.dev, 'vdev': 0}]},
                 'profile': {'label_start': self.side['label_start'], 'compression': [], 'checksum': []},
                 'timeline': [{'txg': 100, 'time': 1}], 'target': {'dataset': 'p/home', 'root_names': names},
-                'scan': {'device': 'd0', 'chunk_dir': os.path.relpath(self.raw, fx.REPO), 'log': 'x.log'}}
+                'scan': {'device': 'd0', 'chunk_dir': self.raw, 'log': 'x.log'}}
         cpath = os.path.join(self.dir, 'case.json')
         with open(cpath, 'w') as f:
             json.dump(case, f)

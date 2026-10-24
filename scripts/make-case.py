@@ -322,7 +322,7 @@ def main():
     ap.add_argument('--target')
     ap.add_argument('--root-names', default='')
     ap.add_argument('--name')
-    ap.add_argument('--out', default='cases')
+    ap.add_argument('--out', default=os.environ.get('ZFS_SALVAGE_CASES_DIR') or 'cases')
     ap.add_argument('--yes', action='store_true', help='accept defaults, no questions')
     ap.add_argument('--zdb-timeout', type=int, default=ZDB_TIMEOUT, help='seconds per zdb call (default %(default)s)')
     ap.add_argument('--zdb-budget', type=int, default=600,

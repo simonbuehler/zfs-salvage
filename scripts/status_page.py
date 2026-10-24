@@ -261,7 +261,7 @@ def main():
 
     cat_state = None
     try:
-        cat_state = int(sqlite3.connect(DB).execute(
+        cat_state = int(sqlite3.connect(f'file:{DB}?mode=ro', uri=True).execute(
             "select state from entry where path='/'").fetchone()[0])
     except Exception:
         pass

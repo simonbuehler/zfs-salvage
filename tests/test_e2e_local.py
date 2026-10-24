@@ -61,8 +61,8 @@ class EndToEndOnOneMachine(unittest.TestCase):
                     'profile': {'label_start': side['label_start'], 'compression': [], 'checksum': []},
                     'timeline': [{'txg': side['newest_txg'], 'time': 1}], 'compatibility': [],
                     'target': {'dataset': side['target'], 'root_names': names},
-                    'scan': {'device': 'd0', 'chunk_dir': os.path.relpath(raw, fx.REPO),
-                             'log': os.path.relpath(os.path.join(work, 'scan.log'), fx.REPO)}}
+                    'scan': {'device': 'd0', 'chunk_dir': raw,
+                             'log': os.path.join(work, 'scan.log')}}
             cpath = os.path.join(work, 'case.json')
             with open(cpath, 'w') as f:
                 json.dump(case, f)

@@ -1,0 +1,4 @@
+#!/bin/bash
+# A zdb for the doctor tests: -l prints a label, unless ZDB_MODE=nolabel
+[ "$1" = -l ] && { [ "${ZDB_MODE:-}" = nolabel ] && echo "failed to unpack label 0" || echo "    name: 'fx-pool'"; }
+exit 0

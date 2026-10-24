@@ -20,7 +20,7 @@ case "$DEV" in /*) ;; *) DEV="/dev/mapper/$DEV" ;; esac
 CHUNK_GIB="${2:-64}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 HOST="$(python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1] + "/scripts"); from common import HOST; print(HOST)' "$REPO")"      # ZFS_SALVAGE_HOST, else local if the case's devices exist here
-OUT="${3:-$REPO/logs/raw/scan_$(basename "$DEV")}"
+OUT="${3:-${ZFS_SALVAGE_STATE_DIR:-$REPO}/logs/raw/scan_$(basename "$DEV")}"
 mkdir -p "$OUT"
 
 # from the case: TXG limit, the top-level vdev of this device and the highest vdev id

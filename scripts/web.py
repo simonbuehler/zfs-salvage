@@ -36,8 +36,19 @@ def db():
     return c
 
 
-def ensure_schema():
+def has_catalog():
+    """True once catalog.py has built the catalog (an empty or missing database file does not count)."""
     if not os.path.exists(DB):
+        return False
+    try:
+        with sqlite3.connect(f'file:{DB}?mode=ro', uri=True) as c:
+            return c.execute("select count(*) from sqlite_master where name = 'entry'").fetchone()[0] == 1
+    except sqlite3.Error:
+        return False
+
+
+def ensure_schema():
+    if not has_catalog():
         return
     c = db()
     cols = {r[1] for r in c.execute('pragma table_info(entry)')}
@@ -188,7 +199,7 @@ def workflow():
     except Exception:
         w['scan'] = {}
     cat_txg = None
-    if os.path.exists(DB):
+    if has_catalog():
         c = db()
         try:
             cat_txg = int(c.execute("select state from entry where path='/'").fetchone()[0])
@@ -256,7 +267,7 @@ class H(BaseHTTPRequestHandler):
             if os.path.exists(f):
                 return self.send(open(f, 'rb').read(), ctype='text/tab-separated-values')
             return self.send({'error': 'no manifest'}, 404)
-        if not os.path.exists(DB):
+        if not has_catalog():
             return self.send({'error': 'no catalog yet'}, 404)
         c = db()
         if u.path == '/api/summary':

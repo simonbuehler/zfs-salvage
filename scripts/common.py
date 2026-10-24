@@ -26,11 +26,17 @@ WORKFLOW = f'{STATUS}/workflow.json'
 TREE_PROFILE = f'{STATUS}/tree_profile.json'     # facts measured on a verified tree (rank-trees.py)
 CATALOG = os.environ.get('ZFS_SALVAGE_CATALOG_DIR') or f'{REPO}/catalog'     # catalog, selection, transfers
 DB = f'{CATALOG}/catalog.sqlite'
+CASES = os.environ.get('ZFS_SALVAGE_CASES_DIR') or f'{REPO}/cases'          # case files (make-case.py writes here)
+
+
+def _under_state(p):
+    """Paths in a case file are relative to the state directory (the repository by default) unless absolute."""
+    return p if os.path.isabs(p) else f'{STATE}/{p}'
 
 
 def load_case():
     path = os.environ.get('ZFS_SALVAGE_CASE') or next(
-        (p for p in sorted(glob.glob(f'{REPO}/cases/*.json')) if not p.endswith('example.json')), None)
+        (p for p in sorted(glob.glob(f'{CASES}/*.json')) if not p.endswith('example.json')), None)
     return json.load(open(path)) if path else {}
 
 
@@ -61,10 +67,10 @@ TARGET = CASE.get('target', {})
 TARGET_NAME = TARGET.get('dataset', 'target')
 _scan = CASE.get('scan', {})
 SCAN_DEVICE = _scan.get('device', '')
-RAW = f"{REPO}/{_scan.get('chunk_dir') or 'logs/raw/scan_' + (SCAN_DEVICE or 'device')}"
+RAW = _under_state(_scan.get('chunk_dir') or 'logs/raw/scan_' + (SCAN_DEVICE or 'device'))
 # pools with several top-level vdevs: one scan per vdev (scan-device.sh writes the vdev id into each dir)
-RAWS = [f'{REPO}/{d}' for d in _scan.get('chunk_dirs', [])] or [RAW]
-SCAN_LOG = f"{REPO}/{_scan.get('log') or 'logs/scan.log'}"
+RAWS = [_under_state(d) for d in _scan.get('chunk_dirs', [])] or [RAW]
+SCAN_LOG = _under_state(_scan.get('log') or 'logs/scan.log')
 
 
 def profile():

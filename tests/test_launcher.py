@@ -1,0 +1,109 @@
+"""./zfs-salvage: version, the sudo message, doctor, bundle-info, and that everything lands in ./data."""
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+import urllib.error
+import urllib.request
+
+import fx  # noqa: I001 - first: puts scripts/ on the path
+
+LAUNCHER = os.path.join(fx.REPO, 'zfs-salvage')
+
+
+def run(*args, env=None, timeout=120):
+    e = dict(os.environ)
+    for k in ('ZFS_SALVAGE_STATE_DIR', 'ZFS_SALVAGE_CATALOG_DIR', 'ZFS_SALVAGE_CASES_DIR', 'ZFS_SALVAGE_CASE', 'ZFS_SALVAGE_HOST'):
+        e.pop(k, None)
+    e.update(env or {})
+    return subprocess.run([LAUNCHER, *args], capture_output=True, text=True, env=e, timeout=timeout)
+
+
+class Launcher(unittest.TestCase):
+    def test_version(self):
+        r = run('version')
+        self.assertEqual(r.returncode, 0)
+        self.assertRegex(r.stdout.strip(), r'^zfs-salvage \S+')
+
+    def test_version_from_a_bundle_file(self):
+        d = tempfile.mkdtemp()
+        try:
+            for sub in ('scripts',):
+                shutil.copytree(os.path.join(fx.REPO, sub), os.path.join(d, sub), ignore=shutil.ignore_patterns('__pycache__'))
+            shutil.copy(LAUNCHER, d)
+            with open(os.path.join(d, 'VERSION'), 'w') as f:
+                f.write('0.1.0-test\n')
+            r = subprocess.run([os.path.join(d, 'zfs-salvage'), 'version'], capture_output=True, text=True)
+            self.assertEqual(r.stdout.strip(), 'zfs-salvage 0.1.0-test')
+        finally:
+            fx.rmtree(d)
+
+    @unittest.skipIf(os.geteuid() == 0, 'this test is about not being root')
+    def test_without_root_it_says_so_and_stops(self):
+        r = run()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('run with sudo', r.stdout)
+        self.assertIn('sudo ./zfs-salvage', r.stdout)
+
+    def test_unknown_command(self):
+        r = run('frobnicate')
+        self.assertEqual(r.returncode, 2)
+
+    def test_bundle_info_lists_what_is_included(self):
+        r = run('bundle-info', env={'ZFS_SALVAGE_STATE_DIR': tempfile.gettempdir() + '/zs-data-x'})
+        self.assertIn('included:     scripts/zsread.py', r.stdout)
+        self.assertIn('data:         ' + tempfile.gettempdir() + '/zs-data-x', r.stdout)
+
+    def test_doctor_runs_through_the_launcher(self):
+        state = tempfile.mkdtemp()
+        try:
+            r = run('doctor', '--json', '--no-root', env={'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local'})
+            checks = {c['check'] for c in json.loads(r.stdout)}
+            self.assertTrue({'root', 'zdb', 'zscan', 'data directory', 'case file'} <= checks)
+        finally:
+            fx.rmtree(state)
+
+    def test_web_keeps_everything_in_the_data_directory(self):
+        state = tempfile.mkdtemp()
+        with socket.socket() as s:
+            s.bind(('127.0.0.1', 0))
+            port = s.getsockname()[1]
+        e = dict(os.environ, ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_HOST='local', SALVAGE_UI_PORT=str(port))
+        for k in ('ZFS_SALVAGE_CATALOG_DIR', 'ZFS_SALVAGE_CASES_DIR', 'ZFS_SALVAGE_CASE'):
+            e.pop(k, None)
+        p = subprocess.Popen([LAUNCHER, 'web'], env=e, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            deadline, wf = time.time() + 30, None
+            while time.time() < deadline and wf is None:
+                try:
+                    wf = json.load(urllib.request.urlopen(f'http://127.0.0.1:{port}/api/workflow', timeout=3))
+                except OSError:
+                    time.sleep(0.5)
+            self.assertIsNotNone(wf, 'the web UI did not start')
+            self.assertTrue(os.path.isdir(os.path.join(state, 'catalog')))
+            self.assertTrue(os.path.isdir(os.path.join(state, 'cases')))
+            deadline = time.time() + 30
+            while time.time() < deadline and not os.path.exists(os.path.join(state, 'status', 'index.html')):
+                time.sleep(0.5)
+            self.assertTrue(os.path.exists(os.path.join(state, 'status', 'index.html')), 'status page not in the data directory')
+            # regression: generating the status page used to create an empty catalog file, which broke the API for good
+            self.assertFalse(os.path.exists(os.path.join(state, 'catalog', 'catalog.sqlite')))
+            self.assertIn('alerts', json.load(urllib.request.urlopen(f'http://127.0.0.1:{port}/api/workflow', timeout=5)) | {'alerts': 0})
+            try:
+                urllib.request.urlopen(f'http://127.0.0.1:{port}/api/summary', timeout=5)
+                self.fail('/api/summary should say there is no catalog')
+            except urllib.error.HTTPError as e:
+                self.assertEqual(e.code, 404)
+        finally:
+            p.terminate()
+            p.wait(timeout=10)
+            fx.rmtree(state)
+
+
+if __name__ == '__main__':
+    unittest.main()
