@@ -270,9 +270,11 @@ LIB_ERROR = None          # why the C library is not used (None = it is)
 def _load_lib():
     import ctypes
     global LIB_ERROR
-    paths = (os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libzsalvage.so'),
+    here = os.path.dirname(os.path.abspath(__file__))
+    paths = (os.path.join(here, 'libzsalvage.so'),
+             os.path.join(os.path.dirname(here), 'tools', 'libzsalvage', 'libzsalvage.so'),      # in the repository / bundle
              '/usr/local/lib/libzsalvage.so')
-    LIB_ERROR = 'libzsalvage.so not found (looked next to zsread.py and in /usr/local/lib)'
+    LIB_ERROR = 'libzsalvage.so not found (looked next to zsread.py, in tools/libzsalvage and in /usr/local/lib)'
     for p in paths:
         if os.path.exists(p):
             try:

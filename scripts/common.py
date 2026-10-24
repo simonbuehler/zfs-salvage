@@ -1,8 +1,9 @@
 """Shared settings for the workstation-side scripts.
 
 Everything pool-specific comes from the case file (cases/<name>.json, written by make-case.py;
-pick one with ZFS_SALVAGE_CASE=<path> if there are several). The recovery host is an SSH alias
-or user@host in ZFS_SALVAGE_HOST (default: recovery-host).
+pick one with ZFS_SALVAGE_CASE=<path> if there are several). The machine that has the pool's devices
+is the "recovery host": ZFS_SALVAGE_HOST=<ssh alias or user@host>, or `local` when the tool runs on that
+machine itself (the default if all devices of the case exist here, else `recovery-host`).
 """
 import glob
 import json
@@ -13,8 +14,6 @@ import subprocess
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HOST = os.environ.get('ZFS_SALVAGE_HOST', 'recovery-host')
-READER = os.environ.get('ZFS_SALVAGE_READER') or '/usr/local/bin/zsread.py'    # installed by scripts/deploy-tools.sh
 
 # runtime state (status page files, run logs) lives below ZFS_SALVAGE_STATE_DIR, default: the repository
 STATE = os.environ.get('ZFS_SALVAGE_STATE_DIR') or REPO
@@ -25,7 +24,8 @@ PROBED = f'{STATUS}/probed.jsonl'
 PROBE_STATS = f'{STATUS}/probe_stats.json'
 WORKFLOW = f'{STATUS}/workflow.json'
 TREE_PROFILE = f'{STATUS}/tree_profile.json'     # facts measured on a verified tree (rank-trees.py)
-DB = f'{REPO}/catalog/catalog.sqlite'
+CATALOG = os.environ.get('ZFS_SALVAGE_CATALOG_DIR') or f'{REPO}/catalog'     # catalog, selection, transfers
+DB = f'{CATALOG}/catalog.sqlite'
 
 
 def load_case():
@@ -35,6 +35,28 @@ def load_case():
 
 
 CASE = load_case()
+
+
+def _default_host():
+    if os.environ.get('ZFS_SALVAGE_HOST'):
+        return os.environ['ZFS_SALVAGE_HOST']
+    devs = [d.get('path', '').split('@')[0] for d in CASE.get('pool', {}).get('devices', [])]
+    return 'local' if devs and all(os.path.exists(d) for d in devs) else 'recovery-host'
+
+
+HOST = _default_host()
+LOCAL = HOST == 'local'
+# zsread.py on the recovery host: in the repository when local, else installed by scripts/deploy-tools.sh
+READER = os.environ.get('ZFS_SALVAGE_READER') or (f'{REPO}/scripts/zsread.py' if LOCAL else '/usr/local/bin/zsread.py')
+ZSCAN = f'{REPO}/tools/zscan/zscan' if LOCAL else 'zscan'
+
+
+def remote_argv(cmd, host=None, opts=()):
+    """argv that runs a shell command on `host` (default: the recovery host): ssh, or bash for `local`."""
+    host = host or HOST
+    return ['bash', '-c', cmd] if host == 'local' else ['ssh', *opts, host, cmd]
+
+
 TARGET = CASE.get('target', {})
 TARGET_NAME = TARGET.get('dataset', 'target')
 _scan = CASE.get('scan', {})
@@ -97,7 +119,7 @@ def ssh(cmd, timeout=20, **kw):
     is the remote command's own."""
     err = None
     try:
-        r = subprocess.run(['ssh', '-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes', HOST, cmd],
+        r = subprocess.run(remote_argv(cmd, opts=('-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes')),
                            capture_output=True, text=True, timeout=timeout, **kw)
         if r.returncode == 255:
             err = next((l.strip() for l in r.stderr.splitlines() if l.strip()), 'ssh failed (exit status 255)')

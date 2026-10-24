@@ -12,7 +12,7 @@ import sqlite3
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB = f'{REPO}/catalog/catalog.sqlite'
+DB = (os.environ.get('ZFS_SALVAGE_CATALOG_DIR') or f'{REPO}/catalog') + '/catalog.sqlite'
 
 CATS = {
     'photo': {'jpg', 'jpeg', 'png', 'gif', 'tif', 'tiff', 'heic', 'cr2', 'nef', 'arw', 'dng', 'bmp', 'webp', 'raf', 'orf'},

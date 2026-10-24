@@ -18,8 +18,8 @@ set -uo pipefail
 DEV="${1:?usage: scan-device.sh <device> [chunk_gib] [outdir]}"
 case "$DEV" in /*) ;; *) DEV="/dev/mapper/$DEV" ;; esac
 CHUNK_GIB="${2:-64}"
-HOST="${ZFS_SALVAGE_HOST:-recovery-host}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+HOST="$(python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1] + "/scripts"); from common import HOST; print(HOST)' "$REPO")"      # ZFS_SALVAGE_HOST, else local if the case's devices exist here
 OUT="${3:-$REPO/logs/raw/scan_$(basename "$DEV")}"
 mkdir -p "$OUT"
 
@@ -38,15 +38,29 @@ echo "${VDEV:-0}" > "$OUT/vdev"                 # rank-trees.py prefixes this vd
 for s in ${ZFS_SALVAGE_IND_SIZES:-}; do MAXOPT="$MAXOPT --ind-size $s"; done
 echo "max txg: ${MAXTXG:-none}, top-level vdev ${VDEV:-0} of 0..${MAXVDEV:-0}, indirect block sizes: ${ZFS_SALVAGE_IND_SIZES:-128K and 16K}"
 
+# remote COMMAND runs a shell command on the recovery host (ssh), or here when HOST=local
+if [ "$HOST" = local ]; then
+    remote() { bash -c "$1"; }
+    ZSCAN="$REPO/tools/zscan/zscan"
+else
+    remote() { ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 "$HOST" "$1"; }
+    ZSCAN=zscan
+fi
+
 # pre-flight: every failure is one clear ERROR line (the status page shows the last one)
 fail() { echo "ERROR: $*"; exit 1; }
-err="$(ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" true 2>&1)" || fail "cannot reach $HOST over ssh: $(echo "$err" | head -1)"
-ssh "$HOST" 'command -v zscan >/dev/null' || fail "zscan is not installed on $HOST – run scripts/deploy-tools.sh"
-ssh "$HOST" "zscan --max-vdev 0 /dev/null 2>&1 | grep -qE 'unknown or incomplete option|No such file'" \
+if [ "$HOST" = local ]; then
+    [ -x "$ZSCAN" ] || fail "zscan is not built ($ZSCAN) – run tools/zscan/build.sh, or use a release bundle"
+else
+    err="$(ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" true 2>&1)" || fail "cannot reach $HOST over ssh: $(echo "$err" | head -1)"
+    remote 'command -v zscan >/dev/null' || fail "zscan is not installed on $HOST – run scripts/deploy-tools.sh"
+fi
+remote "$ZSCAN --max-vdev 0 /dev/null 2>&1 | grep -qE 'unknown or incomplete option|No such file'" \
     && fail "zscan on $HOST is too old (no --max-vdev) – run scripts/deploy-tools.sh"
-[ "$(ssh "$HOST" "blockdev --getro $DEV")" = 1 ] || fail "$DEV does not exist or is not read-only on $HOST – refusing to scan"
-
-SIZE=$(ssh "$HOST" "blockdev --getsize64 $DEV")
+# a block device must be read-only (blockdev --setro); an image file must have no owner write bit (chmod a-w)
+RO="$(remote "if [ -b $DEV ]; then blockdev --getro $DEV; elif [ -f $DEV ] && [ \"\$(stat -c %A $DEV | cut -c3)\" = - ]; then echo 1; fi")"
+[ "$RO" = 1 ] || fail "$DEV does not exist or is not read-only on $HOST – refusing to scan"
+SIZE=$(remote "if [ -b $DEV ]; then blockdev --getsize64 $DEV; else stat -c %s $DEV; fi")
 STEP=$((CHUNK_GIB << 30))
 N=$(( (SIZE + STEP - 1) / STEP ))
 echo "$DEV: $SIZE bytes, $N chunks of $CHUNK_GIB GiB -> $OUT"
@@ -57,8 +71,7 @@ for ((i = 0; i < N; i++)); do
     start=$((i * STEP)); end=$(((i + 1) * STEP))
     for try in 1 2 3; do
         t0=$(date +%s)
-        if ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6 "$HOST" \
-               "zscan $MAXOPT $DEV $start $end 2>/dev/null" | gzip -1 > "$f" &&
+        if remote "$ZSCAN $MAXOPT $DEV $start $end 2>/dev/null" | gzip -1 > "$f" &&
            [ "${PIPESTATUS[0]}" = 0 ]; then
             touch "$f.done"
             echo "$(date +%H:%M) chunk $i/$N done: $(zcat "$f" | wc -l) finds, $(( $(date +%s) - t0 )) s"

@@ -40,7 +40,7 @@ button{cursor:pointer} button.pri{background:var(--acc);color:var(--onacc);borde
     <div class="tiles" id="tiles">
       <button class="tile" data-t="local"><span class="ic">💻</span><span><b>This computer</b><small>a drive or folder here (Windows drives work too)</small></span></button>
       <button class="tile" data-t="ssh"><span class="ic">🖧</span><span><b>Another computer</b><small>over SSH, e.g. the Windows PC or the NAS</small></span></button>
-      <button class="tile" data-t="rescue"><span class="ic">🛟</span><span><b>Recovery host</b><small>a disk plugged into the recovery machine</small></span></button>
+      <button class="tile" data-t="rescue"><span class="ic">🛟</span><span><b id="rescue-title">Recovery host</b><small id="rescue-sub">a disk plugged into the recovery machine</small></span></button>
     </div>
     <div class="field" id="hostrow" hidden><span>Computer</span>
       <div class="chips"><select id="host"></select><input id="hostother" placeholder="user@host" hidden></div></div>
@@ -52,7 +52,7 @@ button{cursor:pointer} button.pri{background:var(--acc);color:var(--onacc);borde
     <details style="margin-top:10px"><summary class="mut">How the copy works</summary>
       <p class="mut">Every file is read block by block from the old disks and each block is verified by its ZFS checksum (falling back to the
       second copy). Files keep their original timestamps. A manifest records every file with its result and SHA-256 – download it from the list below.
-      Files whose blocks cannot be verified are written as far as possible and marked “partial”.</p></details>
+      Files whose blocks cannot be verified are written as far as possible and marked “partial”. When a copy is complete, every file is hashed again <b>on the target</b> and compared with the SHA-256 from the source; only then is it called verified. An interrupted run is never trusted blindly: its last files are copied again on resume.</p></details>
   </section>
 
   <section class="card">
@@ -112,6 +112,19 @@ function updateGo(){
 }
 async function startJob(t){await postJ('/api/transfer/start',t||target());pollJobs()}
 async function stopJob(id){await postJ('/api/transfer/stop',{id});pollJobs()}
+async function verifyJob(id){await postJ('/api/transfer/verify',{id});pollJobs()}
+async function recopyJob(id){if(confirm('Copy the files that differ or are missing again?')){await postJ('/api/transfer/recopy',{id});pollJobs()}}
+// The copy is only trusted once its files were hashed on the target and equal the manifest.
+function verifyLine(j){
+  const v=j.verify, run=j.state==='running';
+  if(!v)return run?'':(/^(done|stopped)$/.test(j.state)?`<div class="mut">Not verified yet. <button onclick="verifyJob('${j.id}')">verify copy</button></div>`:'');
+  if(v.state==='running')return `<div class="mut">⟳ verifying on the target: ${fmtN(v.checked)} / ${fmtN(v.total)} files …</div>`;
+  if(v.state==='failed')return `<div class="bad">✗ verification failed: ${esc(v.error)} <button onclick="verifyJob('${j.id}')">try again</button></div>`;
+  if(v.state==='interrupted')return `<div class="mut">Verification was interrupted. <button onclick="verifyJob('${j.id}')">verify copy</button></div>`;
+  if(v.bad_n)return `<div class="bad">✗ ${fmtN(v.bad_n)} of ${fmtN(v.total)} files differ or are missing on the target (${fmtN(v.missing_n)} missing)
+    <button class="pri" onclick="recopyJob('${j.id}')">re-copy ${fmtN(v.bad_n)} files</button><div class="log">${(v.bad_sample||[]).map(esc).join('\n')}</div></div>`;
+  return `<div class="ok">✓ all ${fmtN(v.total)} files checked on the target: SHA-256 equal to the source <button onclick="verifyJob('${j.id}')">verify again</button></div>`;
+}
 const ICON={running:'⟳',done:'✓',stopped:'■',prepared:'·'};
 async function pollJobs(){
   const jobs=(await get('/api/transfer/status')).reverse();
@@ -130,12 +143,15 @@ async function pollJobs(){
       <div class="bar"><div style="width:${pct.toFixed(1)}%"></div></div>
       <div class="mut num">${fmtN(j.files)} / ${fmtN(j.files_total)} files · ${fmtB(j.bytes)} / ${fmtB(j.bytes_total)}${run?` · ${fmtB(rate)}/s`:''}${eta?` · about ${Math.round(eta/60)} min left`:''}
         · <span class="ok">✓ ${fmtN(j.ok)} OK</span> · ! ${fmtN(j.partial)} partial · <span class="${j.errors?'bad':''}">✗ ${fmtN(j.errors)} errors</span>${j.already_done?` · ${fmtN(j.already_done)} copied earlier`:''}</div>
+      ${verifyLine(j)}
       ${run&&j.current?`<div class="mut">now: ${esc(j.current)}</div>`:''}
       ${run||bad?`<div class="log">${(j.recent||[]).map(esc).join('\n')}</div>`:''}</div>`}).join('');
-  if(jobs.some(j=>j.state==='running'))setTimeout(pollJobs,2000);
+  if(jobs.some(j=>j.state==='running'||(j.verify&&j.verify.state==='running')))setTimeout(pollJobs,2000);
 }
 
 (async()=>{
+  const wf=await get('/api/workflow');
+  if(wf.host&&wf.host.local){$('rescue-title').textContent='A disk on this machine';$('rescue-sub').textContent='a mounted disk checked for free space, RAM disks and read-only mounts'}
   sum=await get('/api/summary');
   $('what').innerHTML=sum.sel_files
     ?`${files(sum.sel_files)} · ${fmtB(sum.sel_bytes)} selected from state TXG ${fmtN(+sum.state)} · <a href="/select">change selection</a>`

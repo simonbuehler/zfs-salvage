@@ -4,9 +4,16 @@
 #
 # Usage: scripts/deploy-tools.sh [host=$ZFS_SALVAGE_HOST or recovery-host]
 set -euo pipefail
-HOST="${1:-${ZFS_SALVAGE_HOST:-recovery-host}}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+HOST="${1:-"$(python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1] + "/scripts"); from common import HOST; print(HOST)' "$REPO")"}"
 
+if [ "$HOST" = local ]; then
+    for f in tools/zscan/zscan tools/libzsalvage/libzsalvage.so; do
+        [ -f "$REPO/$f" ] || { echo "missing $f – build it first (${f%/*}/build.sh) or use a release bundle"; exit 1; }
+    done
+    echo "local mode: the tools are used from $REPO, nothing to install"
+    exit 0
+fi
 for f in tools/zscan/zscan tools/libzsalvage/libzsalvage.so; do
     [ -f "$REPO/$f" ] || { echo "missing $f – build it first (${f%/*}/build.sh) or use a release bundle"; exit 1; }
 done

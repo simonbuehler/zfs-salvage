@@ -23,8 +23,8 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (CANDIDATES, HOST, PROBE_STATS, PROBED, RAW, RAWS, TARGET, TARGET_NAME, TREE_PROFILE,
-                    classify, newest_txg, profile, reader_cmd, ssh, ssh_error)
+from common import (CANDIDATES, PROBE_STATS, PROBED, RAW, RAWS, TARGET, TARGET_NAME, TREE_PROFILE,
+                    classify, newest_txg, profile, reader_cmd, remote_argv, ssh, ssh_error)
 
 LABEL = profile().get('label_start', 0x400000)
 
@@ -99,6 +99,7 @@ def min_birth_during_scan():
 
 
 def run(limit):
+    os.makedirs(os.path.dirname(PROBED), exist_ok=True)          # a fresh installation has no status directory yet
     probed = {}
     if os.path.exists(PROBED):
         for line in open(PROBED):
@@ -122,7 +123,7 @@ def run(limit):
     health = {'host_error': ssh_error(), 'slow_mode': prev.get('slow_mode'), 'slow_reason': prev.get('slow_reason')}
     if batch:
         inp = ''.join(f'{k} {o} {cp} {ps} {ls} {b}\n' for k, o, cp, ps, ls, b in batch)
-        res = subprocess.run(['ssh', '-o', 'ServerAliveInterval=30', HOST, reader_cmd('batch')],
+        res = subprocess.run(remote_argv(reader_cmd('batch'), opts=('-o', 'ServerAliveInterval=30')),
                              input=inp, capture_output=True, text=True, timeout=7200)
         if res.returncode == 255:                # ssh itself failed, nothing was probed
             health['host_error'] = next((l.strip() for l in res.stderr.splitlines() if l.strip()), 'ssh failed')

@@ -22,9 +22,9 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import status_page  # noqa: E402
 import transfer  # noqa: E402
-from common import CANDIDATES, DB, HOST, LOGS, REPO, STATUS, WORKFLOW, reader_cmd  # noqa: E402
+from common import CANDIDATES, CATALOG, DB, HOST, LOCAL, LOGS, REPO, STATUS, WORKFLOW, reader_cmd, remote_argv  # noqa: E402
 
-RULES = f'{REPO}/catalog/selection_rules.jsonl'
+RULES = f'{CATALOG}/selection_rules.jsonl'
 UI = f'{REPO}/scripts/ui/index.html'
 STATUS_PAGE = f'{STATUS}/index.html'
 PORT = int(os.environ.get('SALVAGE_UI_PORT', 8765))
@@ -159,10 +159,10 @@ def rebuild_catalog(cand=None):
         global CATALOG_JOB
         try:
             args = f"{cand['kind']} {cand['offset']} {cand['comp']} {cand['psize']} {cand['lsize']}"
-            os.makedirs(f'{REPO}/logs/tree', exist_ok=True)
-            tsv = f"{REPO}/logs/tree/tree_{cand['txg']}.tsv"
+            os.makedirs(f'{LOGS}/tree', exist_ok=True)
+            tsv = f"{LOGS}/tree/tree_{cand['txg']}.tsv"
             with open(tsv, 'w') as out:
-                r = subprocess.run(['ssh', '-o', 'ServerAliveInterval=30', HOST, reader_cmd('tree', args)],
+                r = subprocess.run(remote_argv(reader_cmd('tree', args), opts=('-o', 'ServerAliveInterval=30')),
                                    stdout=out, stderr=subprocess.PIPE, text=True, timeout=7200)
             if r.returncode != 0:
                 raise RuntimeError(r.stderr[-300:])
@@ -172,7 +172,7 @@ def rebuild_catalog(cand=None):
             if res.returncode != 0:
                 raise RuntimeError(res.stderr[-300:])
             json.dump({'txg': cand['txg'], 'kind': cand['kind'], 'offset': cand['offset'], 'comp': cand['comp'],
-                       'psize': cand['psize'], 'lsize': cand['lsize']}, open(f'{REPO}/catalog/state.json', 'w'))
+                       'psize': cand['psize'], 'lsize': cand['lsize']}, open(f'{CATALOG}/state.json', 'w'))
             CATALOG_JOB = {'state': 'done', 'txg': cand['txg'], 'end': time.time(), 'info': res.stdout.splitlines()[0]}
         except Exception as e:  # noqa: BLE001
             CATALOG_JOB = {'state': 'failed', 'txg': cand.get('txg'), 'info': f'{type(e).__name__}: {e}'}
@@ -199,9 +199,14 @@ def workflow():
     newest = (w.get('newest') or {}).get('txg')
     w['catalog'] = {'txg': cat_txg, 'update': bool(newest and cat_txg and newest > cat_txg), 'job': CATALOG_JOB}
     jobs = transfer.status()
+    w['host'] = {'name': HOST, 'local': LOCAL}
     w['transfer'] = {'jobs': len(jobs), 'running': any(j['state'] == 'running' for j in jobs),
                      'last_label': jobs[-1].get('label') if jobs else None,
-                     'done': any(j['state'] == 'done' for j in jobs),
+                     'done': any(j['state'] == 'done' and (j.get('verify') or {}).get('state') == 'done'
+                                 and not j['verify'].get('bad_n') for j in jobs),     # copied AND verified
+                     'unverified': sum(1 for j in jobs if j['state'] == 'done'
+                                       and (j.get('verify') or {}).get('state') != 'done'),
+                     'with_problems': sum(1 for j in jobs if (j.get('verify') or {}).get('bad_n')),
                      'files': sum(j.get('files', 0) for j in jobs),
                      'last_state': jobs[-1]['state'] if jobs else None}
     return w
@@ -232,7 +237,7 @@ class H(BaseHTTPRequestHandler):
         if u.path == '/transfer':
             return self.send(open(f'{REPO}/scripts/ui/transfer.html', 'rb').read(), ctype='text/html')
         if u.path == '/api/transfer/preset':                    # optional prepared target
-            f = f'{REPO}/catalog/transfer_preset.json'
+            f = f'{CATALOG}/transfer_preset.json'
             return self.send(json.load(open(f)) if os.path.exists(f) else {})
         if u.path == '/api/transfer/hosts':
             return self.send(transfer.ssh_hosts())
@@ -277,6 +282,10 @@ class H(BaseHTTPRequestHandler):
             return self.send(transfer.check(body))
         if self.path == '/api/transfer/start':
             return self.send(transfer.start(body))
+        if self.path == '/api/transfer/verify':
+            return self.send(transfer.start_verify(body.get('id', '')))
+        if self.path == '/api/transfer/recopy':
+            return self.send(transfer.start_recopy(body.get('id', '')))
         if self.path == '/api/transfer/stop':
             j = transfer.JOBS.get(body.get('id'))
             if j:

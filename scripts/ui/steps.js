@@ -29,7 +29,9 @@
       ['/select', 'select', 2, 'Select files', sel.files ? `${n(sel.files)} file${sel.files === 1 ? '' : 's'} · ${gb(sel.bytes)}`
         : 'nothing selected yet', sel.files ? 'done' : ''],
       ['/transfer', 'transfer', 3, 'Transfer', t.running ? `running · ${n(t.files)} files copied`
-        : (t.jobs ? `last: ${t.last_label} · ${t.last_state}` : 'not started'), t.done ? 'done' : ''],
+        : t.with_problems ? `⚠ ${t.with_problems} copy with missing or different files`
+        : t.unverified ? `copied, not verified yet` : (t.jobs ? `last: ${t.last_label} · ${t.last_state}` : 'not started'),
+        t.done ? 'done' : ''],
     ];
     nav.innerHTML = steps.map(([href, pg, num, title, sub, st]) =>
       `<a href="${href}" class="${st}${pg === page ? ' cur' : ''}" title="${sub}">
