@@ -321,7 +321,7 @@ def check_features(args):
     forced = common.CASE.get('unsupported') or []
     if blocking or forced:
         text = (blocking[0].get('text') if blocking else forced[0])
-        return FAIL, f'this pool has properties that are not supported: {text}', 'Other tools (e.g. PhotoRec) can carve files by content.'
+        return FAIL, f'this pool has properties that are not supported: {text}', 'See the capability matrix in the README; other tools (e.g. PhotoRec) can carve files by content.'
     if not common.CASE:
         return OK, 'no case yet, nothing to check', ''
     return OK, 'the pool uses only supported properties', ''

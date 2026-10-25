@@ -26,10 +26,10 @@ logs/rank-trees.log
 logs/make-case.log
 logs/scan-job.log
 # jobs of the web UI and the setup page (state below the data directory, which is the repository by default)
-jobs/
-setup/
-active-case
-data/
+/jobs/
+/setup/
+/active-case
+/data/
 
 # catalog and transfers (rebuilt from logs/tree; selection and manifests are per user)
 catalog/*.sqlite
@@ -37,3 +37,6 @@ catalog/selection_rules.jsonl
 catalog/state.json
 catalog/transfers/
 catalog/transfer_preset.json
+
+# demo video: generated content, pool, recording and cut
+demo/build/

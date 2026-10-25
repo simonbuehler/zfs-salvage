@@ -46,7 +46,8 @@ recovery host (has the disks)             workstation
    known files, export, then run zscan + `zsread.py tree`/`extract` with
    `ZSREAD_DEVS=/path/img` and compare SHA-256 sums. To simulate the target situation, overwrite the
    dataset's objset block (find it with `zdb -dddd`) and check that the tree is still found.
-4. Update the capability matrix in README.md and the `SUPPORTED` / `HINTS` tables in `make-case.py`.
+4. Add a fixture variant for it to `tests/capability_map.json` (the README's capability matrix is generated from the
+   test results: `tests/run.sh --matrix`, `scripts/gen-matrix.py --write`) and update `SUPPORTED` / `REFUSALS` in `make-case.py`.
 
 ## Conventions
 

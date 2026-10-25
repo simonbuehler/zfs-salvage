@@ -117,7 +117,7 @@ async function poll(){
     if(!$('ds').dataset.done){$('ds').dataset.done=1;
       $('ds').innerHTML='<tr><th></th><th>Dataset</th><th>State</th><th>Objects</th></tr>'+p.datasets.map(d=>
         `<tr><td><input type="radio" name="ds" value="${esc(d.name)}" ${d.name===p.proposed_target?'checked':''}></td><td>${esc(d.name)}</td>`+
-        `<td>${d.readable?'<span class="ok">readable</span>':'<span class="bad">cannot be read</span> <span class="mut">'+esc(d.error||'')+'</span>'}</td><td class="num">${d.objects??''}</td></tr>`).join('')+
+        `<td>${d.readable?'<span class="ok">readable</span>':`<span class="bad" title="${esc(d.error||'')}">cannot be read</span> <span class="mut">${/no valid copy/.test(d.error||'')?'no copy matches its checksum':esc(d.error||'')}</span>`}</td><td class="num">${d.objects??''}</td></tr>`).join('')+
         `<tr><td><input type="radio" name="ds" value="" id="dsother"></td><td colspan="3"><input id="dsname" style="width:100%" placeholder="not in the list (destroyed)? type its name, e.g. tank/home" oninput="$('dsother').value=this.value;$('dsother').checked=true"></td></tr>`}}
   $('caseinfo').textContent=jobLine(J.case,'writing the case'); $('mkcase').disabled=run(J.case)||run(J.scan);
   $('caselog').hidden=J.case.state!=='failed'; $('caselog').textContent=(J.case.tail||[]).filter(l=>/NOT SUPPORTED|->|problem|Several/i.test(l)).join('\n');

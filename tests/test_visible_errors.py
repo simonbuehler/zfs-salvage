@@ -99,10 +99,29 @@ class StatusPage(unittest.TestCase):
         self.assertIn('Scan: zscan is not installed on fakehost', page)
 
 
+    def test_scan_progress_is_read_from_the_english_log(self):
+        """Found while recording the demo: the page only understood the old German log ("Bytes, … Abschnitte à")."""
+        with open(EXAMPLE_CASE) as f:
+            case = json.load(f)
+        raw = os.path.join(self.state, 'raw')
+        os.makedirs(raw)
+        case['scan'].update(log=os.path.join(self.state, 'scan.log'), chunk_dir=raw)
+        path = os.path.join(self.state, 'case.json')
+        with open(path, 'w') as f:
+            json.dump(case, f)
+        with open(os.path.join(self.state, 'scan.log'), 'w') as f:
+            f.write('/dev/mapper/ro_sdb1: 268435456 bytes, 1 chunks of 64 GiB -> raw\n12:00 chunk 0/1 done: 693 finds, 1 s\nALL CHUNKS: 1/1\n')
+        for name in ('chunk_0000.tsv.gz', 'chunk_0000.tsv.gz.done'):
+            open(os.path.join(raw, name), 'w').close()
+        page = run_status_page(self.state, 'local', ZFS_SALVAGE_CASE=path)
+        self.assertIn('(268 MB)', page)
+        self.assertIn('Scan complete</b> · 1 chunks', page)
+
 def free_port():
     with socket.socket() as s:
         s.bind(('127.0.0.1', 0))
         return s.getsockname()[1]
+
 
 
 class WebServer(unittest.TestCase):

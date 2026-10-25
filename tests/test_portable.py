@@ -1,6 +1,6 @@
 """tools/check-portable.sh: the glibc limit that decides whether the binaries run on old systems.
 objdump and file are replaced by shims, so the test does not depend on the compiler of this machine; building in
-the manylinux2014 container (tools/build-portable.sh) needs Docker and network and was run by hand."""
+the manylinux2014 container (tools/build-portable.sh) needs Docker and network and is run by the CI."""
 import os
 import subprocess
 import tempfile

@@ -19,7 +19,8 @@ import jobs
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROBE = f'{common.STATE}/setup/probe.json'
 ZDB = os.environ.get('ZFS_SALVAGE_ZDB') or 'zdb'
-RESTART = {'pending': False}          # set when a new case was written: web.py restarts itself to load it
+RESTART = {'pending': False}
+ON_CHANGE = lambda: None            # web.py: regenerate the status page when a job ends          # set when a new case was written: web.py restarts itself to load it
 
 
 def run_doctor():
@@ -133,6 +134,11 @@ def failing_disks():
 def _scan_done(job):
     if job.st.get('state') == 'done':                 # the last chunks: rank once more
         start_rank()
+    ON_CHANGE()
+
+
+def _rank_done(job):
+    ON_CHANGE()
 
 
 def start_rank():
@@ -196,4 +202,4 @@ def cancel(name):
 PROBE_JOB = jobs.job('probe')
 CASE_JOB = jobs.job('case', on_exit=_case_written)
 SCAN_JOB = jobs.job('scan', restart=True, on_exit=_scan_done)
-RANK_JOB = jobs.job('rank', restart=True)
+RANK_JOB = jobs.job('rank', restart=True, on_exit=_rank_done)

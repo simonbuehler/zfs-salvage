@@ -47,7 +47,9 @@ class Workflow(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
 
     def test_fixtures_come_from_the_repository_s_own_release(self):
-        self.assertIn('${{ github.repository }}', workflow()['env']['FIXTURES_URL'])
+        step = next(s for s in workflow()['jobs']['test']['steps'] if s.get('name') == 'Fetch the fixture pools')
+        self.assertIn('gh release download "$FIXTURES_RELEASE" --repo "${{ github.repository }}"', step['run'])
+        self.assertEqual(step['env']['GH_TOKEN'], '${{ github.token }}', 'works for private repositories too')
 
 
 class FixtureAsset(unittest.TestCase):

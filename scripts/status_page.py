@@ -24,6 +24,10 @@ LOG = SCAN_LOG
 L6_LEVEL = (profile().get('meta_dnode_levels') or 7) - 2
 
 
+def fmt_bytes(n):
+    return f'{n / 1e12:.2f} TB' if n >= 1e12 else f'{n / 1e9:.1f} GB' if n >= 1e9 else f'{n / 1e6:.0f} MB'
+
+
 def num(x):
     return f'{x:,}'
 
@@ -276,7 +280,7 @@ def states_card(cands, cat_state):
 def main():
     os.makedirs(OUT, exist_ok=True)
     log = open(LOG).read() if os.path.exists(LOG) else ''
-    m = re.search(r'(\d+) Bytes, (\d+) (?:Abschnitte à|chunks of) (\d+) GiB', log)
+    m = re.search(r'(\d+) bytes, (\d+) (?:Abschnitte à|chunks of) (\d+) GiB', log, re.I)       # older logs are German
     size, n, gib = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 64)
     step = gib << 30
     done = sorted(glob.glob(f'{RAW}/chunk_*.tsv.gz.done'))
@@ -376,8 +380,9 @@ def main():
     hero = (f'<div class="hero"><div><span class="mut">Best recoverable state of {html.escape(TARGET.get("dataset", "target"))}</span>'
             f'<b class="big">{txg_date(newest) if newest else "–"}</b>'
             f'<span class="mut">TXG {num(newest or 0)} · {num(best.get("objects") or 0)} objects · top level: {html.escape(str(best.get("root") or "–"))}</span></div>'
-            f'<div class="kpi"><div>Goal: last change<b>{txg_label(goal) if goal else "–"}</b></div>'
-            f'<div>Distance to goal<b>{gap_txt}</b></div><div>Readable states<b>{num(byds.get(TARGET_NAME, 0))}</b></div></div>'
+            '<div class="kpi">' + (f'<div>Goal: last change<b>{txg_label(goal)}</b></div><div>Distance to goal<b>{gap_txt}</b></div>'
+                                   if goal else '')          # only cases that know when the dataset last changed
+            + f'<div>Readable states<b>{num(byds.get(TARGET_NAME, 0))}</b></div></div>'
             f'<div>{action} <span id="cj" class="mut"></span></div></div>')
     scanning = cur_idx >= 0 or len(done) < n
     banner = ''.join(f'<div class="alert {sev}"><b>{"✗" if sev == "error" else "!"}</b> {html.escape(text)}</div>'
@@ -456,7 +461,7 @@ h3{{font-size:14px;margin:14px 0 6px}}
 <div class="card" id="hero">{hero}</div>
 <div id="states">{states_card(cands, cat_state)}</div>
 {crash_note}
-<div class="card" id="scan"><b>Scan</b> <span class="mut">– device {html.escape(SCAN_DEVICE)} ({size / 1e12:.2f} TB)</span>
+<div class="card" id="scan"><b>Scan</b> <span class="mut">– device {html.escape(SCAN_DEVICE)} ({fmt_bytes(size)})</span>
 <div class="bar" style="margin:8px 0"><div style="width:{100 * frac:.1f}%"></div></div>
 <div>{scan_head}</div><div class="mut">{html.escape(cur_txt)} · disk temperature {temps}</div>
 <details style="margin-top:8px"><summary>Disk map – one tile per {gib} GiB, colour = amount of ZFS metadata found</summary>
@@ -487,7 +492,7 @@ async function cj(){{try{{const j=await (await fetch('/api/catalog/status')).jso
  e.textContent=j.state==='running'?`⟳ building catalog from TXG ${{j.txg}} – ${{j.info}} …`:j.state==='failed'?`✗ failed: ${{j.info}}`:'';
  if(j.state==='running'){{document.querySelectorAll('#hero button, #states button').forEach(b=>b.disabled=true);poll=poll||setInterval(cj,3000)}}
  else if(poll){{clearInterval(poll);poll=null;if(j.state==='done')location.reload()}}}}catch(e){{}}}}
-async function choose(b){{b.disabled=true;await fetch('/api/target/choose',{{method:'POST',body:JSON.stringify({{names:JSON.parse(b.dataset.names)}})}});setTimeout(()=>location.reload(),2500)}}
+async function choose(b){{b.disabled=true;b.textContent='…';await fetch('/api/target/choose',{{method:'POST',body:JSON.stringify({{names:JSON.parse(b.dataset.names)}})}});location.reload()}}
 async function rebuildFrom(b){{b.disabled=true;await fetch('/api/catalog/rebuild',{{method:'POST',body:JSON.stringify({{candidate:JSON.parse(b.dataset.cand)}})}});cj()}}
 async function rebuild(){{await fetch('/api/catalog/rebuild',{{method:'POST',body:'{{}}'}});cj()}}
 cj();

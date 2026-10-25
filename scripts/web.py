@@ -200,6 +200,7 @@ def rebuild_catalog(cand=None):
                 raise RuntimeError(res.stderr[-300:])
             json.dump({'txg': cand['txg'], 'kind': cand['kind'], 'offset': cand['offset'], 'comp': cand['comp'],
                        'psize': cand['psize'], 'lsize': cand['lsize']}, open(f'{CATALOG}/state.json', 'w'))
+            refresh_status()
             CATALOG_JOB = {'state': 'done', 'txg': cand['txg'], 'end': time.time(), 'info': res.stdout.splitlines()[0]}
         except Exception as e:  # noqa: BLE001
             CATALOG_JOB = {'state': 'failed', 'txg': cand.get('txg'), 'info': f'{type(e).__name__}: {e}'}
@@ -386,8 +387,8 @@ class H(BaseHTTPRequestHandler):
 
 
 def choose_target(body):
-    """The user clicked "this one" on a group of trees (tree_groups.json): remember its names in the case and
-    refresh the candidate list in the background."""
+    """The user clicked "this one" on a group of trees (tree_groups.json): remember its names in the case, relabel the
+    candidates (no new reads) and regenerate the status page."""
     names = body.get('names')
     if not (isinstance(names, list) and names and all(isinstance(n, str) and n for n in names)):
         return {'error': 'names must be a non-empty list'}, 400
@@ -395,20 +396,30 @@ def choose_target(body):
         common.set_root_names(names[:100])
     except (ValueError, OSError) as e:
         return {'error': str(e)}, 400
-    subprocess.Popen([sys.executable, '-I', f'{REPO}/scripts/rank-trees.py', '0'], stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL)
+    subprocess.run([sys.executable, '-I', f'{REPO}/scripts/rank-trees.py', '0'], stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL, timeout=600)
+    refresh_status()                           # the page the browser reloads next shows the choice already
     return {'ok': True, 'names': names[:100]}, 200
 
 
-def status_loop():
-    """Regenerate the status page every 20 s (errors go to logs/status_page.err)."""
-    while True:
+STATUS_LOCK = threading.Lock()
+
+
+def refresh_status():
+    """Regenerate the status page now (errors go to logs/status_page.err)."""
+    with STATUS_LOCK:
         try:
             status_page.main()
         except Exception as e:  # noqa: BLE001 - the page must not take the server down
             os.makedirs(LOGS, exist_ok=True)
             with open(f'{LOGS}/status_page.err', 'a') as f:
                 f.write(time.strftime('%H:%M:%S ') + f'{type(e).__name__}: {e}\n')
+
+
+def status_loop():
+    """Regenerate the status page every 20 s, and right away after a choice, a catalog or a finished job."""
+    while True:
+        refresh_status()
         time.sleep(20)
 
 
@@ -434,6 +445,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     ensure_schema()
+    setup_api.ON_CHANGE = refresh_status
     setup_api.resume()
     threading.Thread(target=restart_when_a_case_was_written, daemon=True).start()
     threading.Thread(target=status_loop, daemon=True).start()

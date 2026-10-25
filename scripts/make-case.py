@@ -214,7 +214,8 @@ def diagnose(ubs, txg, datasets, target):
                      'its old trees may still be on the disk; the scan finds them.')
     elif not tgt.get('readable'):
         d['situation'] = 'objset'
-        d['text'] = (f'{target} is listed, but its objset block cannot be read ({tgt.get("error", "no valid copy")}). That is the damage '
+        why = 'no copy matches its checksum' if 'no valid copy' in (tgt.get('error') or 'no valid copy') else tgt['error']
+        d['text'] = (f'{target} is listed, but its objset block cannot be read ({why}). That is the damage '
                      'this tool works around: the scan finds the file tree directly on the disk.')
     else:
         d['situation'] = 'intact'

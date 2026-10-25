@@ -72,7 +72,7 @@ class Protection(unittest.TestCase):
         return self.srv.request(*a, **kw)[0]
 
     def test_post_without_token_is_forbidden(self):
-        # the classic example: curl -X POST localhost:8765/api/select -d '{"op":"reset"}'
+        # for example: curl -X POST localhost:8765/api/select -d '{"op":"reset"}'
         self.assertEqual(self.status('POST', '/api/select', body='{"op":"reset"}'), 403)
         self.assertEqual(self.status('POST', '/api/transfer/start', body='{}'), 403)
 

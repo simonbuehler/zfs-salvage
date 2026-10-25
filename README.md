@@ -17,6 +17,10 @@ the files you choose to any machine. It never writes to the pool disks.
 > early, experimental starter project with a narrow format coverage, not a polished product. See the
 > [capability matrix](#capability-matrix).
 
+![zfs-salvage rescuing the files of a damaged demo pool: set up, find a state, choose files, copy and verify](docs/demo.gif)
+
+*A real rescue of an invented demo pool, shortened. A real scan reads the whole disk and takes hours.*
+
 ## When it helps
 
 - The pool imports (or `zdb` can open the MOS), but a dataset fails with

@@ -1,5 +1,6 @@
-# Tests on every push and pull request. The fixture pools (about 30 MB) are not in git: they are a release asset,
-# the one named by FIXTURES_URL (create it with tests/pack-fixtures.sh and upload it to a release called fixtures-N).
+# Tests on every push and pull request. The fixture pools (about 30 MB) are not in git: they are the asset fixtures.tar of
+# the release FIXTURES_RELEASE of this repository (made with tests/pack-fixtures.sh). `gh release download` with the
+# workflow's token works for private repositories too.
 name: tests
 
 on:
@@ -10,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  FIXTURES_URL: https://github.com/${{ github.repository }}/releases/download/fixtures-1/fixtures.tar
+  FIXTURES_RELEASE: fixtures-1
 
 jobs:
   test:
@@ -23,7 +24,11 @@ jobs:
         run: tools/build-portable.sh
 
       - name: Fetch the fixture pools
-        run: tests/fetch-fixtures.sh "$FIXTURES_URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$FIXTURES_RELEASE" --repo "${{ github.repository }}" --pattern fixtures.tar --dir "$RUNNER_TEMP"
+          tests/fetch-fixtures.sh "$RUNNER_TEMP/fixtures.tar"
 
       - name: Unit and integration tests
         run: python3 -W error::ResourceWarning -m unittest discover -s tests
