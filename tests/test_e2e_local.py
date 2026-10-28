@@ -68,7 +68,6 @@ class EndToEndOnOneMachine(unittest.TestCase):
                 json.dump(case, f)
             env = env_for(os.path.join(work, 'state'), 'down', ZFS_SALVAGE_CASE=cpath,
                           ZFS_SALVAGE_CATALOG_DIR=os.path.join(work, 'catalog'))
-            del env['ZFS_SALVAGE_HOST']                       # the default must be "local": the device exists here
             env.pop('ZFS_SALVAGE_READER', None)               # and the tools come from the repository
 
             r = subprocess.run(['bash', os.path.join(fx.SCRIPTS, 'scan-device.sh'), dev, '64', raw], env=env,
@@ -88,7 +87,6 @@ class EndToEndOnOneMachine(unittest.TestCase):
                                     env=dict(env, SALVAGE_UI_PORT=str(port)), stdout=subprocess.DEVNULL,
                                     stderr=subprocess.DEVNULL)
             wait(lambda: api(port, '/api/workflow'), 'the web server')
-            self.assertTrue(api(port, '/api/workflow')['host']['local'])
             self.assertEqual(api(port, '/api/workflow')['alerts'] if 'alerts' in api(port, '/api/workflow') else [], [])
 
             self.assertEqual(api(port, '/api/catalog/rebuild', {})['state'], 'running')

@@ -1,16 +1,14 @@
 """Shared settings for the workstation-side scripts.
 
 Everything pool-specific comes from the case file (cases/<name>.json, written by make-case.py;
-pick one with ZFS_SALVAGE_CASE=<path> if there are several). The machine that has the pool's devices
-is the "recovery host": ZFS_SALVAGE_HOST=<ssh alias or user@host>, or `local` when the tool runs on that
-machine itself (the default if there is no case yet or all its devices exist here, else `recovery-host`).
+pick one with ZFS_SALVAGE_CASE=<path> if there are several). Everything runs on the machine that has the
+pool's devices; to use the web UI from another computer, forward its port with `ssh -L`.
 """
 import glob
 import json
 import os
 import shlex
 import subprocess
-import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -61,24 +59,12 @@ def load_case():
 CASE = load_case()
 
 
-def _default_host():
-    if os.environ.get('ZFS_SALVAGE_HOST'):
-        return os.environ['ZFS_SALVAGE_HOST']
-    devs = [d.get('path', '').split('@')[0] for d in CASE.get('pool', {}).get('devices', [])]
-    # no case yet (fresh installation on the machine that has the disks): local; a case whose devices are not here: remote
-    return 'local' if all(os.path.exists(d) for d in devs) else 'recovery-host'
+READER = os.environ.get('ZFS_SALVAGE_READER') or f'{REPO}/scripts/zsread.py'
+ZSCAN = f'{REPO}/tools/zscan/zscan'
 
 
-HOST = _default_host()
-LOCAL = HOST == 'local'
-# zsread.py on the recovery host: in the repository when local, else installed by scripts/deploy-tools.sh
-READER = os.environ.get('ZFS_SALVAGE_READER') or (f'{REPO}/scripts/zsread.py' if LOCAL else '/usr/local/bin/zsread.py')
-ZSCAN = f'{REPO}/tools/zscan/zscan' if LOCAL else 'zscan'
-
-
-def remote_argv(cmd, host=None, opts=()):
-    """argv that runs a shell command on `host` (default: the recovery host): ssh, or bash for `local`."""
-    host = host or HOST
+def remote_argv(cmd, host='local', opts=()):
+    """argv that runs a shell command here (`local`) or on a transfer target over ssh."""
     return ['bash', '-c', cmd] if host == 'local' else ['ssh', *opts, host, cmd]
 
 
@@ -136,7 +122,7 @@ def newest_txg():
 
 
 def reader_cmd(*args):
-    """Remote command line for zsread.py with the case's devices (per top-level vdev, if the case
+    """Command line for zsread.py with the case's devices (per top-level vdev, if the case
     knows them) and label offset."""
     devices = CASE.get('pool', {}).get('devices', [])
     if devices and all(d.get('vdev') is not None for d in devices):
@@ -156,31 +142,12 @@ def reader_cmd(*args):
     return f'{env}python3 -I {READER} ' + ' '.join(args)
 
 
-SSH_STATE = {'error': None, 'time': 0.0}      # outcome of the most recent ssh() call
-
-
-def ssh_error():
-    """Why the last ssh() call could not reach the recovery host (first line of ssh's message), or None."""
-    return SSH_STATE['error']
-
-
-def ssh(cmd, timeout=20, **kw):
-    """Run a command on the recovery host; returns stdout ('' on failure). Whether the host could be
-    reached at all is available from ssh_error(): ssh itself fails with exit status 255, any other status
-    is the remote command's own."""
-    err = None
+def shell(cmd, timeout=20):
+    """Run a shell command here; returns stdout ('' on failure or timeout)."""
     try:
-        r = subprocess.run(remote_argv(cmd, opts=('-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes')),
-                           capture_output=True, text=True, timeout=timeout, **kw)
-        if r.returncode == 255:
-            err = next((l.strip() for l in r.stderr.splitlines() if l.strip()), 'ssh failed (exit status 255)')
-        out = r.stdout
-    except subprocess.TimeoutExpired:
-        err, out = f'no answer from {HOST} within {timeout} s', ''
-    except OSError as e:
-        err, out = f'cannot run ssh: {e}', ''
-    SSH_STATE['error'], SSH_STATE['time'] = err, time.time()
-    return out
+        return subprocess.run(['bash', '-c', cmd], capture_output=True, text=True, timeout=timeout).stdout
+    except (subprocess.TimeoutExpired, OSError):
+        return ''
 
 
 def classify(root_names):

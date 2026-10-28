@@ -29,6 +29,6 @@
  ],
  "by_hand_supported": [
   ["Encryption", "below ZFS (LUKS etc., opened read-only)"],
-  ["Targets", "local path (WSL drive letters too), SSH to Linux/Windows, recovery host disk"]
+  ["Targets", "a disk on this machine (WSL drive letters too), SSH to Linux/Windows"]
  ]
 }

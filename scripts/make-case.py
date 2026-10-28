@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """make-case - inspect a damaged ZFS pool (read-only) and write a case file for zfs-salvage.
 
-Runs on the recovery host. Uses `zdb -l`/`-luuuu` (labels and uberblocks: they never open the pool) and
+Runs on the machine with the disks. Uses `zdb -l`/`-luuuu` (labels and uberblocks: they never open the pool) and
 `zsread.py datasets` (our own reader walks the pool's metadata); only reads from the devices, nothing is imported. Everything that is specific to one pool ends up in the case file;
 the other tools read it instead of hardcoding assumptions.
 

@@ -43,7 +43,6 @@ class Rescue:
         self.state = os.path.join(self.work, 'state')
         self.env = env_for(self.state, 'down', ZFS_SALVAGE_CASE=self.case_path,
                            ZFS_SALVAGE_CATALOG_DIR=os.path.join(self.work, 'catalog'))
-        del self.env['ZFS_SALVAGE_HOST']
         self.env.pop('ZFS_SALVAGE_READER', None)
         r = subprocess.run(['bash', os.path.join(fx.SCRIPTS, 'scan-device.sh'), dev, '64', raw], env=self.env,
                            capture_output=True, text=True, timeout=300)

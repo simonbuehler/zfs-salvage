@@ -20,18 +20,22 @@ docs/design.md (how) first.
 
 ## Architecture
 
+Everything runs on the machine that has the pool's disks (usually a live system). The stages are
+separate processes that pass plain files:
+
 ```
-recovery host (has the disks)             workstation
-  zscan  (C, static)    <---- ssh ----    scan-device.sh      chunks -> logs/raw/<dir>/chunk_NNNN.tsv.gz
-  zsread.py batch       <---- ssh ----    rank-trees.py       -> status/probed.jsonl, target_candidates.json
-  zsread.py tree        <---- ssh ----    web.py (catalog)    -> logs/tree/*.tsv -> catalog.py -> catalog.sqlite
-  zsread.py extract     <---- ssh ----    transfer.py         -> tar stream -> target, manifest.tsv
-  libzsalvage.so (C, ctypes)              status_page.py      -> status/index.html, workflow.json
+scan-device.sh  -> zscan (C, static)       chunks -> <data>/logs/raw/<dir>/chunk_NNNN.tsv.gz
+rank-trees.py   -> zsread.py batch         -> <data>/status/probed.jsonl, target_candidates.json
+web.py          -> zsread.py tree          -> <data>/logs/tree/*.tsv -> catalog.py -> catalog.sqlite
+transfer.py     -> zsread.py extract       -> tar stream -> target folder (local or ssh), manifest.tsv
+status_page.py                             -> <data>/status/index.html, workflow.json
 ```
 
-- `zsread.py` runs on the recovery host, uses only the Python standard library, and loads
-  `libzsalvage.so` if present (pure-Python fallback otherwise).
-- The workstation side imports `common.py` for every path and setting.
+- `zsread.py` uses only the Python standard library and loads `libzsalvage.so` (C, via ctypes) if
+  present, with a pure-Python fallback otherwise.
+- Every other script imports `common.py` for every path and setting.
+- The only network use is an optional ssh transfer target. To use the web UI from another
+  computer, forward its port (`ssh -L 8765:localhost:8765 <machine>`).
 - The web UI (`web.py`, `scripts/ui/`) is plain HTML/JS with no build step.
 
 ## Adding a feature (checklist)

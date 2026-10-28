@@ -38,13 +38,12 @@ button{cursor:pointer} button.pri{background:var(--acc);color:var(--onacc);borde
   <section class="card">
     <h2>Where should the files go?</h2>
     <div class="tiles" id="tiles">
-      <button class="tile" data-t="local"><span class="ic">💻</span><span><b>This computer</b><small>a drive or folder here (Windows drives work too)</small></span></button>
+      <button class="tile" data-t="local"><span class="ic">💻</span><span><b>This computer</b><small>a mounted disk here, checked for free space, RAM disks and read-only mounts</small></span></button>
       <button class="tile" data-t="ssh"><span class="ic">🖧</span><span><b>Another computer</b><small>over SSH, e.g. the Windows PC or the NAS</small></span></button>
-      <button class="tile" data-t="rescue"><span class="ic">🛟</span><span><b id="rescue-title">Recovery host</b><small id="rescue-sub">a disk plugged into the recovery machine</small></span></button>
     </div>
     <div class="field" id="hostrow" hidden><span>Computer</span>
       <div class="chips"><select id="host"></select><input id="hostother" placeholder="user@host" hidden></div></div>
-    <div class="field"><span>Folder</span><input id="path" placeholder="e.g. D:\rescued-home or /mnt/d/rescued-home"></div>
+    <div class="field"><span>Folder</span><input id="path" placeholder="e.g. /mnt/target/rescued-home"></div>
     <div class="field"><span class="mut">Suggestions</span><div class="chips" id="places"><span class="mut">…</span></div></div>
     <div class="check" id="check">Choose a place – free space is checked automatically.</div>
     <div class="go"><button class="pri" id="go" disabled onclick="startJob()">Start copying</button>
@@ -84,9 +83,7 @@ async function loadPlaces(){
   if(type==='ssh'&&!host()){el.innerHTML='<span class="mut">choose a computer</span>';return}
   el.innerHTML='<span class="mut">looking for drives …</span>';
   const ps=await get('/api/transfer/places?'+new URLSearchParams({type,host:type==='ssh'?host():''}));
-  if(!ps.length){el.innerHTML=`<span class="mut">${type==='rescue'
-    ?'No writable disk is mounted on the recovery host. Plug one in and mount it there (e.g. <code>mount /dev/sdX1 /mnt/target</code>), then come back.'
-    :'No drives found – type a folder above.'}</span>`;return}
+  if(!ps.length){el.innerHTML=`<span class="mut">${'No writable disk found. Plug one in and mount it (e.g. <code>sudo mount /dev/sdX1 /mnt/target</code>), or type a folder above.'}</span>`;return}
   el.innerHTML=ps.map(p=>`<button class="chip" title="${esc(p.path)}" onclick="pick('${esc(p.path)}')">${esc(p.fs==='home'?'home folder':p.fs||p.path)}${p.fs&&p.fs.endsWith('drive')?'':' '+esc(p.path)} · <b>${fmtB(p.free)}</b> free</button>`).join('');
 }
 function pick(p){$('path').value=p.replace(/[\/\\]$/,'')+'/'+SUB;recheck()}
@@ -151,8 +148,6 @@ async function pollJobs(){
 }
 
 (async()=>{
-  const wf=await get('/api/workflow');
-  if(wf.host&&wf.host.local){$('rescue-title').textContent='A disk on this machine';$('rescue-sub').textContent='a mounted disk checked for free space, RAM disks and read-only mounts'}
   sum=await get('/api/summary');
   $('what').innerHTML=sum.sel_files
     ?`${files(sum.sel_files)} · ${fmtB(sum.sel_bytes)} selected from state TXG ${fmtN(+sum.state)} · <a href="/select">change selection</a>`

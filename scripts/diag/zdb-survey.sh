@@ -1,6 +1,6 @@
 #!/bin/bash
 # Survey without import: which datasets and snapshots of a pool can zdb open at each TXG,
-# from each single device and from all of them? Runs ON the recovery host (with a current
+# from each single device and from all of them? Runs on the machine with the disks (with a current
 # zdb) and reads only from read-only devices.
 #
 # Usage: POOL=<pool> DEVS="<dev> <dev>" [TARGET=<pool/dataset>] zdb-survey.sh [TXG ...]

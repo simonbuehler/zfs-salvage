@@ -19,7 +19,7 @@ def check(pools='', cache=None, services=None, names=('tank',), zpool=ZPOOL):
             with open(cache_path, 'wb') as f:
                 f.write(cache)
         env = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-        env.update(ZFS_SALVAGE_STATE_DIR=d, ZFS_SALVAGE_CASES_DIR=d, ZFS_SALVAGE_HOST='local', ZFS_SALVAGE_ZPOOL=zpool,
+        env.update(ZFS_SALVAGE_STATE_DIR=d, ZFS_SALVAGE_CASES_DIR=d, ZFS_SALVAGE_ZPOOL=zpool,
                    ZFS_SALVAGE_ZPOOL_CACHE=cache_path, FAKE_POOLS=pools,
                    ZFS_SALVAGE_DOCTOR_FAKE=json.dumps({'pool_names': list(names), 'services': services or {}}))
         r = subprocess.run([sys.executable, '-I', DOCTOR, '--json', '--no-root'], capture_output=True, text=True, env=env, timeout=60)

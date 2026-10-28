@@ -27,7 +27,7 @@ class Target(unittest.TestCase):
             json.dump({'pool': {'devices': [{'path': p, 'vdev': 0} for p in pool]}, 'target': {'dataset': 'p/x'}}, f)
         env = {k: v for k, v in os.environ.items() if k != 'ZFS_SALVAGE_ALLOW_RAM_TARGET'}
         env.update(ZFS_SALVAGE_CASE=os.path.join(self.dir, 'case.json'), ZFS_SALVAGE_STATE_DIR=self.dir,
-                   ZFS_SALVAGE_CATALOG_DIR=os.path.join(self.dir, 'catalog'), ZFS_SALVAGE_HOST='local',
+                   ZFS_SALVAGE_CATALOG_DIR=os.path.join(self.dir, 'catalog'), 
                    ZFS_SALVAGE_SMARTCTL=SMARTCTL, FAKE_SMART=smart, ZFS_SALVAGE_DOCTOR_FAKE=json.dumps(fake))
         code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import transfer; "
                 f"print(json.dumps(transfer.{fn}({{'type': 'local', 'dest': sys.argv[2]}})))")
@@ -90,38 +90,6 @@ class Target(unittest.TestCase):
         self.assertEqual(r['state'], 'refused')
         self.assertIn('in RAM', r['info'])
         self.assertFalse(os.path.exists(os.path.join(self.dir, 'catalog', 'transfers')), 'no job may be created')
-
-
-class OnTheRecoveryHost(unittest.TestCase):
-    """type=rescue: the probe runs on the host; lsblk and findmnt are shims in PATH (the host is `local`)."""
-
-    def run_check(self, target_disk, pool_disk):
-        d = tempfile.mkdtemp()
-        try:
-            for name, body in (('findmnt', '#!/bin/bash\n[[ "$*" == *SOURCE* ]] && echo /dev/fake2 || echo "ext4 rw,relatime"\n'),
-                               ('lsblk', f'#!/bin/bash\ncase "$*" in *fake2) echo "/dev/fake2 part"; echo "{target_disk} disk";; '
-                                         f'*) echo "$4 part"; echo "{pool_disk} disk";; esac\n')):
-                with open(os.path.join(d, name), 'w') as f:
-                    f.write(body)
-                os.chmod(os.path.join(d, name), 0o755)
-            with open(os.path.join(d, 'case.json'), 'w') as f:
-                json.dump({'pool': {'devices': [{'path': '/dev/fake1', 'vdev': 0}]}, 'target': {'dataset': 'p/x'}}, f)
-            env = dict(os.environ, PATH=d + os.pathsep + os.environ['PATH'], ZFS_SALVAGE_CASE=os.path.join(d, 'case.json'),
-                       ZFS_SALVAGE_STATE_DIR=d, ZFS_SALVAGE_CATALOG_DIR=d + '/c', ZFS_SALVAGE_HOST='local')
-            code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import transfer; "
-                    "print(json.dumps(transfer.check({'type': 'rescue', 'dest': '/tmp'})))")
-            r = subprocess.run([sys.executable, '-I', '-c', code, fx.SCRIPTS], capture_output=True, text=True, env=env, timeout=60)
-            return json.loads(r.stdout)
-        finally:
-            fx.rmtree(d)
-
-    def test_same_disk_is_refused(self):
-        r = self.run_check('/dev/diskA', '/dev/diskA')
-        self.assertFalse(r['ok'])
-        self.assertIn('/dev/diskA also holds the pool (/dev/fake1)', r['info'])
-
-    def test_other_disk_passes(self):
-        self.assertTrue(self.run_check('/dev/diskB', '/dev/diskA')['ok'])
 
 
 if __name__ == '__main__':

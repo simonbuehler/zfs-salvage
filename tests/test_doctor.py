@@ -40,7 +40,6 @@ class Doctor(unittest.TestCase):
 
     def doctor(self, args=(), fake=None, mode='local', **env):
         settings = dict(ZFS_SALVAGE_CASES_DIR=os.path.join(self.dir, 'cases'), ZFS_SALVAGE_ZDB=ZDB_OK,
-                        ZFS_SALVAGE_HOST='local' if mode == 'local' else 'fakehost',
                         ZFS_SALVAGE_DOCTOR_FAKE=json.dumps(dict(self.fake, **(fake or {}))))
         settings.update(env)                                         # a test may override any of them
         e = env_for(os.path.join(self.dir, 'state'), mode, **settings)
@@ -129,37 +128,6 @@ class Doctor(unittest.TestCase):
     def test_little_memory(self):
         self.assertEqual(self.status('memory', fake={'mem_kb': 1000000})[0], 'WARN')
 
-    def test_unreachable_recovery_host(self):
-        res, rc = self.doctor(mode='down')
-        self.assertEqual(res['recovery host']['status'], 'FAIL')
-        self.assertIn('without a password', res['recovery host']['text'])
-        self.assertEqual(res['zscan']['status'], 'FAIL')
-        self.assertIn('not reachable', res['zscan']['text'])
-        self.assertEqual(rc, 1)
-
-
-class DefaultHost(unittest.TestCase):
-    """Found by running doctor from the bundle on a fresh Ubuntu 24.04: without a case the host was `recovery-host`."""
-
-    def host(self, **env):
-        with tempfile.TemporaryDirectory() as empty:
-            base = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-            r = subprocess.run([sys.executable, '-I', '-c', 'import sys; sys.path.insert(0, sys.argv[1]); import common; print(common.HOST)',
-                                fx.SCRIPTS], capture_output=True, text=True, env=dict(base, ZFS_SALVAGE_CASES_DIR=empty, **env))
-        return r.stdout.strip()
-
-    def test_without_a_case_everything_is_local(self):
-        self.assertEqual(self.host(), 'local')
-
-    def test_case_with_devices_that_are_not_here_means_remote(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = os.path.join(d, 'c.json')
-            with open(path, 'w') as f:
-                json.dump({'pool': {'devices': [{'path': '/dev/mapper/not-here'}]}}, f)
-            self.assertEqual(self.host(ZFS_SALVAGE_CASE=path), 'recovery-host')
-
-    def test_explicit_host_wins(self):
-        self.assertEqual(self.host(ZFS_SALVAGE_HOST='me@box'), 'me@box')
 
 
 if __name__ == '__main__':

@@ -16,8 +16,8 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (CANDIDATES, CASE, DB, HOST, LOGS, PROBE_STATS, RAW, SCAN_DEVICE, SCAN_LOG, STATUS as OUT,
-                    TARGET, TARGET_NAME, TREE_GROUPS, WORKFLOW, profile, ssh, ssh_error)
+from common import (CANDIDATES, CASE, DB, LOGS, PROBE_STATS, RAW, SCAN_DEVICE, SCAN_LOG, STATUS as OUT,
+                    TARGET, TARGET_NAME, TREE_GROUPS, WORKFLOW, profile, shell)
 
 SMART_CACHE = f'{OUT}/.smart.json'
 LOG = SCAN_LOG
@@ -55,7 +55,7 @@ def smart():
     except Exception:
         pass
     disks = ' '.join(CASE.get('smart_disks', []))
-    out = ssh(f"for d in {disks}; do smartctl -A /dev/$d | awk -v d=$d '$1==194{{print d, $10}}'; done") if disks else ''
+    out = shell(f"for d in {disks}; do smartctl -A /dev/$d | awk -v d=$d '$1==194{{print d, $10}}'; done") if disks else ''
     s = {'t': time.time(), 'temp': dict(l.split() for l in out.splitlines() if len(l.split()) == 2)}
     json.dump(s, open(SMART_CACHE, 'w'))
     return s
@@ -295,7 +295,7 @@ def main():
         rows.append((os.path.basename(f), c))
         done_counts[int(re.search(r'chunk_(\d+)', f).group(1))] = c
 
-    cur = ssh("p=$(pgrep -x zscan | head -1); [ -n \"$p\" ] && echo $(tr '\\0' ' ' < /proc/$p/cmdline) "
+    cur = shell("p=$(pgrep -x zscan | head -1); [ -n \"$p\" ] && echo $(tr '\\0' ' ' < /proc/$p/cmdline) "
               "$(awk '/^rchar/{print $2}' /proc/$p/io) $(ps -o etimes= -p $p)")
     cur_txt, cur_frac, cur_idx = 'no zscan process running', 0.0, -1
     parts = cur.split()
@@ -310,7 +310,6 @@ def main():
     eta = (n - len(done) - cur_frac) * avg if avg else None
     temps = ', '.join(f'{d}: {t} °C' for d, t in sorted(smart().get('temp', {}).items())) or '–'
 
-    host_error = ssh_error()
     cands = []
     try:
         cands = json.load(open(CANDIDATES))
@@ -327,11 +326,7 @@ def main():
     except Exception:
         tg = {}
     groups, needs_choice = tg.get('groups', []), tg.get('needs_choice', False)
-    host_error = host_error or pstats.get('host_error')
     alerts = []                                       # (severity, text): problems the user must see
-    if host_error:
-        alerts.append(('error', f'Recovery host {HOST} is unreachable: {host_error} '
-                       '(set ZFS_SALVAGE_HOST, check the SSH key and that the host is running)'))
     scan_err = [l for l in log.splitlines()[-3:] if l.startswith('ERROR:')]
     if scan_err:
         alerts.append(('error', 'Scan: ' + scan_err[-1][6:].strip()))
@@ -341,7 +336,7 @@ def main():
                        'read: damage inside the file tree hides them. The best readable state is older, so changes made after it '
                        f'({txg_label(hidden["best_birth"])}) are missing from the catalog.'))
     if pstats.get('slow_mode'):
-        alerts.append(('warn', 'Slow mode: the C library is not used on the recovery host, reading falls back to '
+        alerts.append(('warn', 'Slow mode: the C library is not used, reading falls back to '
                        'pure Python. ' + (pstats.get('slow_reason') or '').replace('zsread: SLOW MODE - ', '')))
     probe_txt = (f'{num(pstats.get("probed", 0))} candidates verified, {num(pstats.get("pending", 0))} pending'
                  + (f', {num(pstats["deferred"])} older ones deferred until the scan is done' if pstats.get('deferred') else '')

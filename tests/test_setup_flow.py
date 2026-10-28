@@ -207,7 +207,7 @@ class FailingDiskInTheUi(unittest.TestCase):
                 json.dump({'name': 'c', 'pool': {'name': 'p', 'devices': [{'path': '/dev/fake1', 'vdev': 0}]},
                            'target': {'dataset': 'p/h', 'root_names': []}, 'scan': {'device': 'fake1'}}, f)
             env = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-            env.update(ZFS_SALVAGE_STATE_DIR=d, ZFS_SALVAGE_CASE=case, ZFS_SALVAGE_HOST='local', FAKE_SMART='pending',
+            env.update(ZFS_SALVAGE_STATE_DIR=d, ZFS_SALVAGE_CASE=case, FAKE_SMART='pending',
                        ZFS_SALVAGE_SMARTCTL=os.path.join(fx.TESTS, 'bin', 'smartctl-fake'),
                        ZFS_SALVAGE_DOCTOR_FAKE=json.dumps({'disks': {'/dev/fake1': ['/dev/diskA']}}))
             code = ('import json, sys; sys.path.insert(0, sys.argv[1]); import setup_api; '

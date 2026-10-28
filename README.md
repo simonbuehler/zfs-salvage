@@ -63,14 +63,13 @@ The steps in detail:
 1. **Scan** (`tools/zscan`, C): reads the device sequentially (~160–190 MB/s) and classifies
    every 512-byte position as objset block, indirect block of a dnode tree, or dnode block
    (lzjb, lz4 or uncompressed). It writes one TSV per 64 GiB chunk and can be resumed.
-2. **Rank trees** (`scripts/rank-trees.py`): probes the candidates newest TXG first on the
-   recovery host. A candidate counts only if the whole chain down to the root directory
+2. **Rank trees** (`scripts/rank-trees.py`): probes the candidates newest TXG first. A candidate counts only if the whole chain down to the root directory
    verifies by checksum. Verified trees are grouped by their top-level names; if there is more
    than one file system, you pick yours (or give its names in the case file).
 3. **Catalog** (`scripts/catalog.py`): lists the full tree of a chosen state (path, size,
    mtime, readability) into SQLite.
 4. **Select & transfer** (web UI): choose files by folder, type, name or date, then copy them
-   locally, over SSH (Linux or Windows) or to a disk on the recovery host. Every block is checked
+   to a disk on this machine or over SSH (Linux or Windows). Every block is checked
    against its checksum, with fallback to the other DVA and the other disk. Original mtimes are
    kept. A manifest records result and SHA-256 per file. Interrupted transfers resume.
 
@@ -96,7 +95,7 @@ The steps in detail:
 | Datasets | several file systems in one pool, zvols (copied as one sparse .raw image) | — |
 | Recovery | destroyed datasets, files deleted later (older state) | — |
 | Encryption | below ZFS (LUKS etc., opened read-only) | native ZFS encryption |
-| Targets | local path (WSL drive letters too), SSH to Linux/Windows, recovery host disk | — |
+| Targets | a disk on this machine (WSL drive letters too), SSH to Linux/Windows | — |
 <!-- capability-matrix:end -->
 
 The table is generated from the pipeline tests (`tests/run.sh --matrix`, `scripts/gen-matrix.py`): *Supported* is what
@@ -149,8 +148,8 @@ Then follow the three steps in the UI:
    (with the TXG up to which changes are missing) instead of quietly showing the older state as the best one.
 2. **Select files:** folder tree with tri-state checkboxes, quick filters (photos & videos,
    documents, everything without hidden folders), name, date and size filters, and a list of unreadable entries.
-3. **Transfer:** pick this computer, another computer (hosts from `~/.ssh/config`) or a disk of the
-   machine. Drive suggestions show free space. Progress, resume, the manifest and **verify copy** (hashes every
+3. **Transfer:** pick a disk of this machine or another computer (hosts from `~/.ssh/config`).
+   Drive suggestions show free space. Progress, resume, the manifest and **verify copy** (hashes every
    file on the target again) are available per transfer.
 
 All results (scan chunks, catalog, case file, logs) are in `data/` next to `zfs-salvage`. Delete that
@@ -181,14 +180,14 @@ sudo ./zfs-salvage make-case --dev /mnt/target/disk0.img
 
 The image holds the complete partition, so it needs as much free space as the partition is large.
 
-### Advanced: the disks are in another machine (remote mode)
+### Using the web UI from another computer
 
-The tool can also run on your workstation while the disks sit in a recovery machine reachable over
-SSH (alias `recovery-host`, or `ZFS_SALVAGE_HOST=<host>`; passwordless key login is required). On the recovery machine
-open the devices read-only and run `make-case.py` there, copy the case file into `data/cases/` on the workstation, then
-`scripts/deploy-tools.sh` installs `zscan`, `libzsalvage.so` and `zsread.py` on the recovery machine (repeat after every
-reboot of a live system), and scan, ranking and the web UI run on the workstation as above.
-`./zfs-salvage doctor` checks the connection.
+zfs-salvage always runs on the machine that has the pool's disks. The web UI listens on that machine only
+(`localhost:8765`). To work from your desktop instead, forward the port and open the link the launcher printed:
+
+```bash
+ssh -L 8765:localhost:8765 user@rescue-machine
+```
 
 ### Troubleshooting
 
@@ -202,12 +201,11 @@ reboot of a live system), and scan, ranking and the web UI run on the workstatio
 | zdb | zdb found, but no ZFS member device to test it on | Attach the pool's disks (opened read-only) and run `doctor` again. |
 | zdb | `zdb -l …` shows no ZFS label | The device is not a pool member: use the partition (`/dev/sdX3`) or the opened LUKS mapper, not the whole disk, and run as root. |
 | zscan | zscan is not built; zscan is too old; zscan does not run here | Use the release bundle. From a git checkout: `tools/build-portable.sh` (needs Docker). |
-| zscan | zscan is not installed on <host>; zscan on <host> is too old; cannot check zscan | Remote mode: `scripts/deploy-tools.sh` (repeat after every reboot of a live system); the last one means the host is not reachable. |
 | libzsalvage | libzsalvage.so cannot be used | Reading still works but is much slower. Use the release bundle, or `tools/build-portable.sh`. |
 | data directory | the data directory is in RAM | You are running from the live system's RAM disk. Unpack the bundle on a real disk and start it from there. |
 | data directory | only N MB free | Free space or use another disk (1 GB is the minimum; the catalog of a large pool takes some hundred MB). |
 | devices | no ZFS member devices found | Attach the pool's disks; open encrypted ones with `cryptsetup open --readonly …`. |
-| devices | device(s) of the case do not exist here | The disks are attached to another machine (remote mode: set `ZFS_SALVAGE_HOST`), or were not opened yet. |
+| devices | device(s) of the case do not exist here | Attach and open the disks on this machine (zfs-salvage runs where the disks are). |
 | devices | not read-only | `sudo blockdev --setro <device>` (image files: `chmod a-w`). This sets a kernel flag; it does not write to the disk. |
 | import | the pool X is imported on this machine, and an import writes to the disks | ZFS has opened the pool for writing already (some live systems import everything they find). Stop it: `sudo zpool export -f X`, then run `doctor` again. Better still: work on images of the disks. |
 | import | the pool X is listed in /etc/zfs/zpool.cache | ZFS would import it the next time it starts. Move the file away: `sudo mv /etc/zfs/zpool.cache /etc/zfs/zpool.cache.off`. |
@@ -218,7 +216,6 @@ reboot of a live system), and scan, ranking and the web UI run on the workstatio
 | case file | the case file is not valid | Create it again with `./zfs-salvage make-case`. |
 | pool features | this pool has properties that are not supported | See the [capability matrix](#capability-matrix). Tools that carve files by content (e.g. PhotoRec) can still find files. |
 | memory | only N GB RAM | Close other programs; very large pools need more. |
-| recovery host | cannot reach … over ssh | Remote mode only: set up a key login (`ssh-copy-id`), or set `ZFS_SALVAGE_HOST=local` when the disks are in this machine. |
 
 ### When `make-case` says NOT SUPPORTED
 
@@ -244,15 +241,14 @@ It names the reason and what to try instead. `--force` writes the case file anyw
 | `scripts/doctor.py` | the machine check behind `./zfs-salvage doctor` |
 | `tools/zscan/` | raw-device scanner (static C binary) |
 | `tools/libzsalvage/` | fletcher4, lzjb, verified block reads (C, used via ctypes) |
-| `scripts/zsread.py` | userspace ZFS reader: `probe`, `tree`, `batch`, `extract` (runs on the recovery host) |
-| `scripts/deploy-tools.sh` | installs zscan, libzsalvage.so and zsread.py on the recovery host |
+| `scripts/zsread.py` | userspace ZFS reader: `probe`, `tree`, `batch`, `extract` |
 | `scripts/scan-device.sh` | chunked, resumable scan driver |
 | `scripts/rank-trees.py` | candidate verification and ranking |
 | `scripts/catalog.py` | tree listing → SQLite catalog |
 | `scripts/web.py`, `scripts/ui/` | web UI (status, selection, transfer); regenerates the status page |
 | `scripts/status_page.py` | status page and chain diagram |
 | `scripts/transfer.py` | transfer jobs, target checks, manifests |
-| `scripts/common.py` | shared settings: case file, recovery host, paths |
+| `scripts/common.py` | shared settings: case file, paths |
 | `scripts/make-case.py` | case file generator |
 | `scripts/make-bundle.sh` | release tarball with prebuilt binaries |
 | `tools/build-portable.sh` | builds `zscan` (static) and `libzsalvage.so` for glibc 2.17 and newer (Docker) |

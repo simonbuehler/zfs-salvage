@@ -35,7 +35,7 @@ _spec = importlib.util.spec_from_file_location('rank_trees', os.path.join(fx.SCR
 rank_trees = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(rank_trees)
 
-# Expected failures: variant -> (block that makes it pass, why). Applies to <variant> and
+# Expected failures: variant -> ("planned" or "never", why). Applies to <variant> and
 # <variant>-damaged. An entry that passes is reported as XPASS and counts as a failure, so the
 # table has to be updated in the same commit that fixes the behaviour.
 XFAIL = {
@@ -351,7 +351,7 @@ def main():
                 status, detail = 'XPASS', f'{detail} (listed as an expected failure: remove it from XFAIL)'
                 failures += 1
             elif expect:
-                until = '' if expect[0] == 'never' else f'; fixed by {expect[0]}'
+                until = '' if expect[0] == 'never' else '; planned'
                 status, detail = 'XFAIL', f'{detail}  [XFAIL: {expect[1]}{until}]'
             elif ok:
                 status = 'PASS'

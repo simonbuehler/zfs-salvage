@@ -68,7 +68,6 @@ class ChooseInTheUi(unittest.TestCase):
                 json.dump(case, f)
             state = os.path.join(work, 'state')
             env = env_for(state, 'down', ZFS_SALVAGE_CASE=cpath, ZFS_SALVAGE_CATALOG_DIR=os.path.join(work, 'catalog'))
-            del env['ZFS_SALVAGE_HOST']
             env.pop('ZFS_SALVAGE_READER', None)
             r = subprocess.run(['bash', os.path.join(fx.SCRIPTS, 'scan-device.sh'), dev, '64', raw], env=env,
                                capture_output=True, text=True, timeout=300)

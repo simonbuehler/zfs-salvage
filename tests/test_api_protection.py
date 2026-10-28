@@ -24,7 +24,7 @@ class Server:
         self.state = tempfile.mkdtemp()
         self.port = free_port()
         env = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-        env.update(ZFS_SALVAGE_STATE_DIR=self.state, ZFS_SALVAGE_CASES_DIR=self.state, ZFS_SALVAGE_HOST='local',
+        env.update(ZFS_SALVAGE_STATE_DIR=self.state, ZFS_SALVAGE_CASES_DIR=self.state, 
                    SALVAGE_UI_PORT=str(self.port))
         if token:
             env['ZFS_SALVAGE_TOKEN'] = token

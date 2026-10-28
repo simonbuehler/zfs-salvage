@@ -37,11 +37,6 @@ def run(cmd, timeout=30):
         return 127, str(e)
 
 
-def remote(cmd, timeout=30):
-    """Run a command on the recovery host (ssh, or here in local mode)."""
-    return run(common.remote_argv(cmd, opts=('-o', 'ConnectTimeout=8', '-o', 'BatchMode=yes')), timeout)
-
-
 def mount_info(path):
     """(mount point, file system type, source device, options) of the mount that holds path."""
     if 'mounts' in FAKE:
@@ -170,15 +165,6 @@ def check_zdb(args):
 
 def check_zscan(args):
     z = os.environ.get('ZFS_SALVAGE_ZSCAN') or common.ZSCAN
-    if common.HOST != 'local' and not os.environ.get('ZFS_SALVAGE_ZSCAN'):
-        rc, out = remote('zscan --max-vdev 0 /dev/null 2>&1 | head -1; command -v zscan >/dev/null || echo MISSING')
-        if rc == 255:
-            return FAIL, f'cannot check zscan: {common.HOST} is not reachable over ssh', 'See the check "recovery host".'
-        if 'MISSING' in out:
-            return FAIL, f'zscan is not installed on {common.HOST}', 'Run scripts/deploy-tools.sh'
-        if 'unknown or incomplete option' in out or 'No such file' in out:
-            return FAIL, f'zscan on {common.HOST} is too old', 'Run scripts/deploy-tools.sh'
-        return OK, f'zscan is installed on {common.HOST}', ''
     if not os.path.isfile(z) or not os.access(z, os.X_OK):
         return FAIL, f'zscan is not built ({z})', 'Use a release bundle, or build it: tools/zscan/build.sh (needs Docker)'
     rc, out = run([z, '--max-vdev', '0', '/dev/null'])
@@ -225,7 +211,7 @@ def check_devices(args):
         return WARN, 'no ZFS member devices found', 'Attach the pool disks (and open encrypted ones read-only: cryptsetup open --readonly …).'
     bad = [d for d in devs if not os.path.exists(d)]
     if bad:
-        return FAIL, f'device(s) of the case do not exist here: {", ".join(bad)}', 'Attach / open them, or set ZFS_SALVAGE_HOST to the machine that has them.' \
+        return FAIL, f'device(s) of the case do not exist here: {", ".join(bad)}', 'Attach / open them on this machine (zfs-salvage runs where the disks are).' \
             if source == 'case' else 'Attach them.'
     writable = [d for d in devs if not read_only(d)]
     if writable:
@@ -337,19 +323,9 @@ def check_ram(args):
     return OK, f'{kb / 1024 / 1024:.1f} GB RAM', ''
 
 
-def check_host(args):
-    if common.HOST == 'local':
-        return OK, 'everything runs on this machine (no ssh needed)', ''
-    rc, out = run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', common.HOST, 'true'])
-    if rc != 0:
-        return FAIL, f'cannot reach {common.HOST} over ssh without a password: {(out.strip().splitlines() or ["?"])[0][:100]}', \
-            f'Set up a key login (ssh-copy-id {common.HOST}) or set ZFS_SALVAGE_HOST=local when the disks are on this machine.'
-    return OK, f'{common.HOST} reachable over ssh', ''
-
-
 CHECKS = [('root', check_root), ('python', check_python), ('zdb', check_zdb), ('zscan', check_zscan),
           ('libzsalvage', check_lib), ('data directory', check_data_dir), ('devices', check_devices),
-          ('import', check_import), ('smart', check_smart), ('case file', check_case), ('pool features', check_features), ('memory', check_ram), ('recovery host', check_host)]
+          ('import', check_import), ('smart', check_smart), ('case file', check_case), ('pool features', check_features), ('memory', check_ram)]
 
 
 def run_checks(args):

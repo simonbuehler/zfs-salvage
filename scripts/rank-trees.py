@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe the tree-root candidates from finished scan chunks on the recovery host
+"""Probe the tree-root candidates from finished scan chunks
 (zsread.py batch) and rank the verified states of the target dataset.
 
 - Candidates: tree-root blocks (IND whose entries are on level levels - 2, e.g. L6 blocks of a 7-level
@@ -24,7 +24,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (CANDIDATES, PROBE_STATS, PROBED, RAW, RAWS, TARGET, TARGET_NAME, TREE_GROUPS, TREE_PROFILE,
-                    classify, newest_txg, profile, reload_case, reader_cmd, remote_argv, ssh, ssh_error)
+                    classify, newest_txg, profile, reload_case, reader_cmd, shell)
 
 LABEL = profile().get('label_start', 0x400000)
 
@@ -157,7 +157,7 @@ def run(limit):
     allc = [c for raw in RAWS for c in candidates(raw, levels, seen=seen)] if levels else []
     by_off = {c[1]: c for c in allc}
     todo = [c for c in allc if c[1] not in probed]
-    scan_running = ssh('pgrep -x zscan').strip() != ''
+    scan_running = shell('pgrep -x zscan').strip() != ''
     min_birth = min_birth_during_scan() if scan_running else 0
     deferred = sum(1 for c in todo if c[5] < min_birth)
     todo = [c for c in todo if c[5] >= min_birth]
@@ -167,13 +167,11 @@ def run(limit):
     if os.path.exists(PROBE_STATS):
         with open(PROBE_STATS) as f:
             prev = json.load(f)
-    health = {'host_error': ssh_error(), 'slow_mode': prev.get('slow_mode'), 'slow_reason': prev.get('slow_reason')}
+    health = {'slow_mode': prev.get('slow_mode'), 'slow_reason': prev.get('slow_reason')}
     if batch:
         inp = ''.join(f'{k} {o} {cp} {ps} {ls} {b}\n' for k, o, cp, ps, ls, b in batch)
-        res = subprocess.run(remote_argv(reader_cmd('batch'), opts=('-o', 'ServerAliveInterval=30')),
+        res = subprocess.run(['bash', '-c', reader_cmd('batch')],
                              input=inp, capture_output=True, text=True, timeout=7200)
-        if res.returncode == 255:                # ssh itself failed, nothing was probed
-            health['host_error'] = next((l.strip() for l in res.stderr.splitlines() if l.strip()), 'ssh failed')
         slow = [l for l in res.stderr.splitlines() if 'SLOW MODE' in l]
         with open(PROBED, 'a') as f:
             for line in res.stdout.splitlines():
@@ -252,7 +250,7 @@ def main():
         print(time.strftime('%H:%M '), end='')
         try:
             more = run(limit)
-        except Exception as e:  # noqa: BLE001 - keep looping, the recovery host may be rebooting
+        except Exception as e:  # noqa: BLE001 - keep looping, a later round may succeed
             print(f'error: {type(e).__name__}: {e}', flush=True)
             more = True
         if not more:

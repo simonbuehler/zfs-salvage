@@ -1,4 +1,4 @@
-"""Problems that used to be silent are visible: unreachable recovery host, library not used (slow
+"""Problems that used to be silent are visible: library not used (slow
 mode), a scan that cannot start. Uses tests/bin/ssh, a fake ssh, so no host is contacted."""
 import json
 import os
@@ -22,7 +22,7 @@ TOKEN = 'test-token'                 # what the web server of the tests expects 
 
 def env_for(state, mode, **extra):
     e = dict(os.environ, PATH=FAKE_BIN + os.pathsep + os.environ['PATH'], FAKE_SSH=mode, ZFS_SALVAGE_TOKEN=TOKEN,
-             ZFS_SALVAGE_HOST='fakehost', ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_CASE=EXAMPLE_CASE)
+             ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_CASE=EXAMPLE_CASE)
     e.update(extra)
     return e
 
@@ -40,25 +40,6 @@ def run_status_page(state, mode, **extra):
         return f.read()
 
 
-class SshErrors(unittest.TestCase):
-    def call(self, mode):
-        code = ("import sys; sys.path.insert(0, sys.argv[1]); import common; "
-                "out = common.ssh('echo hi'); print(repr(out), repr(common.ssh_error()))")
-        r = subprocess.run([sys.executable, '-I', '-c', code, fx.SCRIPTS], env=env_for(tempfile.gettempdir(), mode),
-                           capture_output=True, text=True, timeout=60)
-        return r.stdout.strip()
-
-    def test_down_is_reported(self):
-        self.assertEqual(self.call('down'), "'' 'ssh: connect to host fake port 22: Connection refused'")
-
-    def test_remote_command_failure_is_not_a_connection_problem(self):
-        code = ("import sys; sys.path.insert(0, sys.argv[1]); import common; "
-                "print(repr(common.ssh('echo out; exit 3')), repr(common.ssh_error()))")
-        r = subprocess.run([sys.executable, '-I', '-c', code, fx.SCRIPTS], env=env_for(tempfile.gettempdir(), 'local'),
-                           capture_output=True, text=True, timeout=60)
-        self.assertEqual(r.stdout.strip(), "'out\\n' None")
-
-
 class StatusPage(unittest.TestCase):
     def setUp(self):
         self.state = tempfile.mkdtemp(prefix='zfs-salvage-state-')
@@ -66,13 +47,7 @@ class StatusPage(unittest.TestCase):
     def tearDown(self):
         fx.rmtree(self.state)
 
-    def test_unreachable_host_is_shown(self):
-        page = run_status_page(self.state, 'down')
-        self.assertIn('Recovery host fakehost is unreachable: ssh: connect to host fake port 22: Connection refused', page)
-        with open(os.path.join(self.state, 'status', 'workflow.json')) as f:
-            self.assertIn('unreachable', f.read())
-
-    def test_reachable_host_shows_no_alert(self):
+    def test_no_problem_shows_no_alert(self):
         page = run_status_page(self.state, 'local')
         self.assertNotIn('class="alert', page)
 
@@ -94,9 +69,9 @@ class StatusPage(unittest.TestCase):
         with open(path, 'w') as f:
             json.dump(case, f)
         with open(os.path.join(self.state, 'scan.log'), 'w') as f:
-            f.write('ro_sdb1: 1000 bytes, 1 chunks\nERROR: zscan is not installed on fakehost – run scripts/deploy-tools.sh\n')
+            f.write('ro_sdb1: 1000 bytes, 1 chunks\nERROR: zscan is not built (tools/zscan/zscan)\n')
         page = run_status_page(self.state, 'local', ZFS_SALVAGE_CASE=path)
-        self.assertIn('Scan: zscan is not installed on fakehost', page)
+        self.assertIn('Scan: zscan is not built', page)
 
 
     def test_scan_progress_is_read_from_the_english_log(self):
@@ -122,30 +97,6 @@ def free_port():
         s.bind(('127.0.0.1', 0))
         return s.getsockname()[1]
 
-
-
-class WebServer(unittest.TestCase):
-    def test_status_page_of_a_running_server_shows_the_unreachable_host_within_30_s(self):
-        """Acceptance: dev instance on its own port, host that cannot be reached."""
-        state, port = tempfile.mkdtemp(prefix='zfs-salvage-state-'), free_port()
-        proc = subprocess.Popen([sys.executable, '-I', os.path.join(fx.SCRIPTS, 'web.py')],
-                                env=env_for(state, 'down', SALVAGE_UI_PORT=str(port)),
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            deadline, text = time.time() + 30, ''
-            while time.time() < deadline and 'is unreachable' not in text:
-                time.sleep(1)
-                try:
-                    text = urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/'), timeout=5).read().decode()
-                except OSError:
-                    pass
-            self.assertIn('is unreachable', text)
-            wf = json.load(urllib.request.urlopen(authed(f'http://127.0.0.1:{port}/api/workflow'), timeout=5))
-            self.assertTrue(wf['alerts'])
-        finally:
-            proc.terminate()
-            proc.wait(timeout=10)
-            fx.rmtree(state)
 
 
 @unittest.skipUnless(fx.have_images('legacy-single') and fx.ensure_built(), 'needs gcc and the legacy-single images')
@@ -232,29 +183,42 @@ class SlowModeChain(unittest.TestCase):
 
 
 class ScanPreflight(unittest.TestCase):
-    def run_scan(self, mode):
+    def run_scan(self, zscan, dev='/dev/null'):
         out = tempfile.mkdtemp(prefix='zfs-salvage-scan-')
         try:
-            r = subprocess.run(['bash', os.path.join(fx.SCRIPTS, 'scan-device.sh'), '/dev/null', '64', out],
-                               env=env_for(out, mode), capture_output=True, text=True, timeout=120)
+            r = subprocess.run(['bash', os.path.join(fx.SCRIPTS, 'scan-device.sh'), dev, '64', out],
+                               env=env_for(out, 'down', ZFS_SALVAGE_ZSCAN=zscan), capture_output=True, text=True, timeout=120)
             return r.returncode, r.stdout
         finally:
             fx.rmtree(out)
 
-    def test_host_unreachable(self):
-        rc, out = self.run_scan('down')
-        self.assertEqual(rc, 1)
-        self.assertIn('ERROR: cannot reach fakehost over ssh: ssh: connect to host fake port 22: Connection refused', out)
+    def fake_zscan(self, answer):
+        d = tempfile.mkdtemp(prefix='zfs-salvage-zscan-')
+        self.addCleanup(fx.rmtree, d)
+        path = os.path.join(d, 'zscan')
+        with open(path, 'w') as f:
+            f.write(f'#!/bin/sh\necho "{answer}"\n')
+        os.chmod(path, 0o755)
+        return path
 
     def test_zscan_missing(self):
-        rc, out = self.run_scan('nozscan')
+        rc, out = self.run_scan('/nonexistent/zscan')
         self.assertEqual(rc, 1)
-        self.assertIn('ERROR: zscan is not installed on fakehost', out)
+        self.assertIn('ERROR: zscan is not built (/nonexistent/zscan)', out)
 
     def test_zscan_too_old(self):
-        rc, out = self.run_scan('oldzscan')
+        rc, out = self.run_scan(self.fake_zscan('unknown or incomplete option'))
         self.assertEqual(rc, 1)
-        self.assertIn('ERROR: zscan on fakehost is too old', out)
+        self.assertIn('ERROR: zscan is too old', out)
+
+    def test_writable_device_is_refused(self):
+        img = os.path.join(tempfile.mkdtemp(prefix='zfs-salvage-img-'), 'pool.img')
+        self.addCleanup(fx.rmtree, os.path.dirname(img))
+        with open(img, 'wb') as f:
+            f.truncate(1 << 20)
+        rc, out = self.run_scan(self.fake_zscan('ok'), img)
+        self.assertEqual(rc, 1)
+        self.assertIn('is not read-only – refusing to scan', out)
 
 
 if __name__ == '__main__':

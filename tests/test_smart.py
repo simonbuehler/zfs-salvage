@@ -15,7 +15,7 @@ FAKE_SMARTCTL = os.path.join(fx.TESTS, 'bin', 'smartctl-fake')
 
 def doctor_smart(mode, disks=None, smartctl=FAKE_SMARTCTL):
     env = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-    env.update(FAKE_SMART=mode, ZFS_SALVAGE_SMARTCTL=smartctl, ZFS_SALVAGE_HOST='local',
+    env.update(FAKE_SMART=mode, ZFS_SALVAGE_SMARTCTL=smartctl, 
                ZFS_SALVAGE_DOCTOR_FAKE=json.dumps({'lsblk': '/dev/fake1 zfs_member', 'disks': {'/dev/fake1': disks or ['/dev/fake']}}))
     state = tempfile.mkdtemp()
     try:
@@ -52,7 +52,7 @@ class SmartInDoctor(unittest.TestCase):
 
     def test_image_files_have_no_disk_to_ask(self):
         with tempfile.NamedTemporaryFile(suffix='.img') as img, tempfile.TemporaryDirectory() as empty:
-            env = dict(os.environ, ZFS_SALVAGE_CASES_DIR=empty, ZFS_SALVAGE_HOST='local', ZFS_SALVAGE_SMARTCTL='/nonexistent/smartctl',
+            env = dict(os.environ, ZFS_SALVAGE_CASES_DIR=empty, ZFS_SALVAGE_SMARTCTL='/nonexistent/smartctl',
                        ZFS_SALVAGE_DOCTOR_FAKE=json.dumps({'lsblk': f'{img.name} zfs_member'}))
             r = subprocess.run([sys.executable, '-I', DOCTOR, '--json', '--no-root'], capture_output=True, text=True, env=env, timeout=60)
             c = next(c for c in json.loads(r.stdout) if c['check'] == 'smart')
@@ -66,7 +66,7 @@ class ScanOfAFailingDisk(unittest.TestCase):
         try:
             dev = fx.unpack('modern-single', work)[0]
             os.chmod(dev, 0o444)
-            env = {'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local', 'FAKE_SMART': smart,
+            env = {'ZFS_SALVAGE_STATE_DIR': state, 'FAKE_SMART': smart,
                    'ZFS_SALVAGE_SMARTCTL': FAKE_SMARTCTL, 'ZFS_SALVAGE_DOCTOR_FAKE': json.dumps({'disks': {dev: ['/dev/fake']}})}
             if anyway:
                 env['ZFS_SALVAGE_SCAN_ANYWAY'] = '1'

@@ -19,7 +19,7 @@ LAUNCHER = os.path.join(fx.REPO, 'zfs-salvage')
 
 def run(*args, env=None, timeout=120):
     e = dict(os.environ)
-    for k in ('ZFS_SALVAGE_STATE_DIR', 'ZFS_SALVAGE_CATALOG_DIR', 'ZFS_SALVAGE_CASES_DIR', 'ZFS_SALVAGE_CASE', 'ZFS_SALVAGE_HOST'):
+    for k in ('ZFS_SALVAGE_STATE_DIR', 'ZFS_SALVAGE_CATALOG_DIR', 'ZFS_SALVAGE_CASES_DIR', 'ZFS_SALVAGE_CASE'):
         e.pop(k, None)
     e.update(env or {})
     return subprocess.run([LAUNCHER, *args], capture_output=True, text=True, env=e, timeout=timeout)
@@ -77,7 +77,7 @@ class Launcher(unittest.TestCase):
         try:
             dev = fx.unpack('modern-single', work)[0]
             os.chmod(dev, 0o444)
-            r = run('scan', dev, '64', env={'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local'})
+            r = run('scan', dev, '64', env={'ZFS_SALVAGE_STATE_DIR': state})
             self.assertEqual(r.returncode, 0, r.stdout[-300:] + r.stderr[-300:])
             self.assertIn('ALL CHUNKS: 1/1', r.stdout)
             log = os.path.join(state, 'logs', 'scan_' + os.path.basename(dev) + '.log')
@@ -91,7 +91,7 @@ class Launcher(unittest.TestCase):
     def test_rank_and_make_case_use_the_data_directory(self):
         state = tempfile.mkdtemp()
         try:
-            r = run('rank', env={'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local'})
+            r = run('rank', env={'ZFS_SALVAGE_STATE_DIR': state})
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertTrue(os.path.exists(os.path.join(state, 'status', 'target_candidates.json')))
             r = run('make-case', '--help', env={'ZFS_SALVAGE_STATE_DIR': state})
@@ -104,7 +104,7 @@ class Launcher(unittest.TestCase):
     def test_doctor_runs_through_the_launcher(self):
         state = tempfile.mkdtemp()
         try:
-            r = run('doctor', '--json', '--no-root', env={'ZFS_SALVAGE_STATE_DIR': state, 'ZFS_SALVAGE_HOST': 'local'})
+            r = run('doctor', '--json', '--no-root', env={'ZFS_SALVAGE_STATE_DIR': state})
             checks = {c['check'] for c in json.loads(r.stdout)}
             self.assertTrue({'root', 'zdb', 'zscan', 'data directory', 'case file'} <= checks)
         finally:
@@ -116,7 +116,7 @@ class Launcher(unittest.TestCase):
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
         e = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-        e.update(ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_HOST='local', SALVAGE_UI_PORT=str(port))
+        e.update(ZFS_SALVAGE_STATE_DIR=state, SALVAGE_UI_PORT=str(port))
         p = subprocess.Popen([LAUNCHER, 'web'], env=e, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         try:
             link = p.stderr.readline().strip()
@@ -143,7 +143,7 @@ class Launcher(unittest.TestCase):
         with socket.socket() as s:
             s.bind(('127.0.0.1', 0))
             port = s.getsockname()[1]
-        e = dict(os.environ, ZFS_SALVAGE_STATE_DIR=state, ZFS_SALVAGE_HOST='local', SALVAGE_UI_PORT=str(port), ZFS_SALVAGE_TOKEN=TOKEN)
+        e = dict(os.environ, ZFS_SALVAGE_STATE_DIR=state, SALVAGE_UI_PORT=str(port), ZFS_SALVAGE_TOKEN=TOKEN)
         for k in ('ZFS_SALVAGE_CATALOG_DIR', 'ZFS_SALVAGE_CASES_DIR', 'ZFS_SALVAGE_CASE'):
             e.pop(k, None)
         p = subprocess.Popen([LAUNCHER, 'web'], env=e, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

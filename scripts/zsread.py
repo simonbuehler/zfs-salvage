@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """zsread - read ZFS objsets without importing the pool (read-only, stdlib only).
 
-Runs on the recovery host. Reads blocks via their DVAs from read-only devices,
+Runs on the machine with the disks. Reads blocks via their DVAs from read-only devices,
 verifies every copy against the checksum stored in the block pointer
 (fletcher4), decompresses lzjb and lz4 and walks meta-dnode -> dnodes -> ZAP/SA.
 Uses libzsalvage.so (C) for checksum/decompression when available.
@@ -1117,7 +1117,7 @@ def cmd_datasets(args):
 if __name__ == '__main__':
     if LIB_ERROR:
         print(f'zsread: SLOW MODE - {LIB_ERROR}; using the pure-Python fallback (works, but much slower). '
-              'Install it with scripts/deploy-tools.sh.', file=sys.stderr, flush=True)
+              'Build it with tools/libzsalvage/build.sh, or use a release bundle.', file=sys.stderr, flush=True)
     cmds = {'probe': cmd_probe, 'tree': cmd_tree, 'batch': cmd_batch, 'extract': cmd_extract, 'datasets': cmd_datasets}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__)

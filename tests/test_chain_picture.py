@@ -25,7 +25,7 @@ def picture(case):
         with open(path, 'w') as f:
             json.dump(case, f)
         env = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-        env.update(ZFS_SALVAGE_CASE=path, ZFS_SALVAGE_STATE_DIR=d, ZFS_SALVAGE_HOST='local')
+        env.update(ZFS_SALVAGE_CASE=path, ZFS_SALVAGE_STATE_DIR=d)
         r = subprocess.run([sys.executable, '-I', '-c', CODE, fx.SCRIPTS], capture_output=True, text=True, env=env, timeout=60)
         assert r.returncode == 0, r.stderr[-500:]
         return json.loads(r.stdout)

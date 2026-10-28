@@ -15,7 +15,7 @@ zfs-salvage re-enters the chain below the broken link: it finds the root of the 
 
 ## Phases
 
-1. **Scan (`tools/zscan`, C, on the recovery host).** Reads the device sequentially. At every
+1. **Scan (`tools/zscan`, C).** Reads the device sequentially. At every
    512-byte position it tries lzjb and lz4 decompression with early abort (and the uncompressed
    interpretation if the start looks like a dnode or block pointer) and classifies:
    - `OBJSET`: dnode 0 of type DNODE with plausible fields, `os_type == ZPL`

@@ -28,8 +28,8 @@ import setup_api  # noqa: E402
 import status_page  # noqa: E402
 import transfer  # noqa: E402
 import common  # noqa: E402
-from common import (CANDIDATES, CATALOG, DB, HOST, LOCAL, LOGS, REPO, STATUS, TREE_GROUPS, WORKFLOW,  # noqa: E402
-                    reader_cmd, remote_argv)
+from common import (CANDIDATES, CATALOG, DB, LOGS, REPO, STATUS, TREE_GROUPS, WORKFLOW,  # noqa: E402
+                    reader_cmd)
 
 RULES = f'{CATALOG}/selection_rules.jsonl'
 UI = f'{REPO}/scripts/ui/index.html'
@@ -170,7 +170,7 @@ CATALOG_JOB = {'state': 'idle'}
 
 
 def rebuild_catalog(cand=None):
-    """List the tree of a verified state on the recovery host and update the catalog (keeps the selection)."""
+    """List the tree of a verified state and update the catalog (keeps the selection)."""
     global CATALOG_JOB
     if CATALOG_JOB.get('state') == 'running':
         return CATALOG_JOB
@@ -180,7 +180,7 @@ def rebuild_catalog(cand=None):
         if not best:
             return {'state': 'failed', 'info': 'no verified candidate with read parameters yet'}
         cand = dict(best['candidate'], txg=best['birth'])
-    CATALOG_JOB = {'state': 'running', 'txg': cand['txg'], 'start': time.time(), 'info': 'listing the tree on the recovery host'}
+    CATALOG_JOB = {'state': 'running', 'txg': cand['txg'], 'start': time.time(), 'info': 'listing the tree'}
 
     def run():
         global CATALOG_JOB
@@ -189,7 +189,7 @@ def rebuild_catalog(cand=None):
             os.makedirs(f'{LOGS}/tree', exist_ok=True)
             tsv = f"{LOGS}/tree/tree_{cand['txg']}.tsv"
             with open(tsv, 'w') as out:
-                r = subprocess.run(remote_argv(reader_cmd('tree', args), opts=('-o', 'ServerAliveInterval=30')),
+                r = subprocess.run(['bash', '-c', reader_cmd('tree', args)],
                                    stdout=out, stderr=subprocess.PIPE, text=True, timeout=7200)
             if r.returncode != 0:
                 raise RuntimeError(r.stderr[-300:])
@@ -227,7 +227,6 @@ def workflow():
     newest = (w.get('newest') or {}).get('txg')
     w['catalog'] = {'txg': cat_txg, 'update': bool(newest and cat_txg and newest > cat_txg), 'job': CATALOG_JOB}
     tjobs = transfer.status()
-    w['host'] = {'name': HOST, 'local': LOCAL}
     w['transfer'] = {'jobs': len(tjobs), 'running': any(j['state'] == 'running' for j in tjobs),
                      'last_label': tjobs[-1].get('label') if tjobs else None,
                      'done': any(j['state'] == 'done' and (j.get('verify') or {}).get('state') == 'done'

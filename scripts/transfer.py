@@ -3,10 +3,9 @@
 Targets:
   local   a path on this machine (Linux path or /mnt/<drive>/... under WSL) -> tar -x -C <path>
   ssh     host:path (ssh config name or user@host; Linux or Windows/OpenSSH) -> ssh host tar -x -f - -C <path>
-  rescue  a path on the recovery host itself (e.g. a disk mounted there)
 
 Flow: selected files from the catalog (minus files already transferred OK to this target)
--> ssh <recovery host> 'zsread extract ...' (tar stream on stdout, manifest lines on stderr) -> target.
+-> 'zsread extract ...' (tar stream on stdout, manifest lines on stderr) -> target.
 Every target gets its own directory catalog/transfers/<target-id>/ with manifest.tsv and status.json,
 so an interrupted transfer resumes where it stopped.
 """
@@ -23,7 +22,7 @@ import threading
 import time
 
 import doctor
-from common import CATALOG, DB, HOST as RESCUE, reader_cmd, remote_argv
+from common import CATALOG, DB, reader_cmd, remote_argv
 
 TDIR = f'{CATALOG}/transfers'
 
@@ -50,17 +49,17 @@ def label(t):
     if t['type'] == 'ssh':
         host, path = split_ssh(t['dest'])
         return f'{host} · {path}'
-    return ('This computer · ' if t['type'] == 'local' else 'Recovery host · ') + t['dest']
+    return 'This computer · ' + t['dest']
 
 
 def ssh_hosts():
-    """Host aliases from ~/.ssh/config usable as targets (no wildcards, git hosts or the recovery host)."""
+    """Host aliases from ~/.ssh/config usable as targets (no wildcards or git hosts)."""
     hosts = []
     try:
         for line in open(os.path.expanduser('~/.ssh/config')):
             m = re.match(r'\s*Host\s+(.+)', line, re.I)
             if m:
-                hosts += [h for h in m.group(1).split() if not re.search(r'[*?]|^git', h) and h != RESCUE]
+                hosts += [h for h in m.group(1).split() if not re.search(r'[*?]|^git', h)]
     except OSError:
         pass
     return hosts
@@ -84,18 +83,18 @@ def _linux_places(host):
 def places(kind, host=''):
     """Suggested target locations with free space."""
     try:
-        if kind == 'local':
-            res = []
+        if kind == 'local':                           # mounted disks, Windows drives under WSL, the home folder
+            res = _linux_places('local')
+            seen = {p['path'] for p in res}
             for d in sorted(glob.glob('/mnt/?')) + [os.path.expanduser('~')]:
                 try:
                     st = os.statvfs(d)
-                    res.append({'path': d, 'free': st.f_bavail * st.f_frsize,
-                                'fs': f'{d[-1].upper()}: drive' if re.match(r'^/mnt/.$', d) else 'home'})
+                    if d not in seen:
+                        res.append({'path': d, 'free': st.f_bavail * st.f_frsize,
+                                    'fs': f'{d[-1].upper()}: drive' if re.match(r'^/mnt/.$', d) else 'home'})
                 except OSError:
                     pass
             return res
-        if kind == 'rescue':
-            return _linux_places(RESCUE)
         if kind == 'ssh':
             if not host:
                 return []
@@ -155,17 +154,10 @@ _LINUX_PROBE = ('p={0}; while [ ! -e "$p" ]; do p=$(dirname "$p"); done; '
                 '[ -w "$p" ] && echo writable || echo readonly-dir')
 
 
-def _pool_probe(devs):
-    """Shell lines that print the disk below the target's file system (TDISK) and below each pool device (PDISK)."""
-    return ('; dk() { lsblk -psnro NAME,TYPE "$1" 2>/dev/null | awk \'$2=="disk"{printf "%s ", $1}\'; }; '
-            'echo "TDISK $(dk "$(findmnt -no SOURCE -T "$p")")"; '
-            + ''.join(f'echo "PDISK {shlex.quote(d)} $(dk {shlex.quote(d)})"; ' for d in devs))
-
-
-def _linux_check(host, path, where, pool_devs=()):
+def _linux_check(host, path, where):
     if not path.startswith('/'):
         return {'ok': False, 'info': 'use an absolute path (starting with /)'}
-    probe = _LINUX_PROBE.format(shlex.quote(path)) + (_pool_probe(pool_devs) if pool_devs else '')
+    probe = _LINUX_PROBE.format(shlex.quote(path))
     out = subprocess.run(remote_argv(probe, host, ('-o', 'ConnectTimeout=8')),
                          capture_output=True, text=True, timeout=30).stdout.split('\n')
     free, fs, w = (out + ['', '', ''])[:3]
@@ -174,13 +166,6 @@ def _linux_check(host, path, where, pool_devs=()):
         return unsafe(f'{path} is in RAM ({fstype}) – choose a real disk')
     if 'ro' in opts.split(',') or w.strip() != 'writable':
         return unsafe(f'{path} is read-only')
-    tdisks = {x for l in out if l.startswith('TDISK ') for x in l.split()[1:]}
-    for l in out:
-        parts = l.split()
-        shared = tdisks & set(parts[2:]) if parts[:1] == ['PDISK'] else set()
-        if shared:
-            return unsafe(f'{path}: {sorted(shared)[0]} also holds the pool ({parts[1]}): writing there could overwrite '
-                          'the very data you want to rescue – choose another disk')
     return {'ok': free.strip().isdigit(), 'free': int(free) if free.strip().isdigit() else None,
             'info': f'{where}: {path} ({fstype})'}
 
@@ -256,8 +241,6 @@ def check(t):
                                  timeout=30).stdout.strip()
             return {'ok': out.isdigit(), 'free': int(out) if out.isdigit() else None,
                     'info': f'{host} (Windows): {path}' if out.isdigit() else f'drive {path[0]}: not found on {host}'}
-        if t['type'] == 'rescue':
-            return _linux_check(RESCUE, d, 'recovery host', doctor.case_devices())
     except Exception as e:  # noqa: BLE001
         return {'ok': False, 'info': f'{type(e).__name__}: {e}'}
     return {'ok': False, 'info': 'unknown target type'}
@@ -334,18 +317,12 @@ class Job:
         if not rows:
             st.update(state='done', end=time.time())
             return self.write_status()
-        src = remote_argv(reader_cmd('extract', state_args()), opts=('-o', 'ServerAliveInterval=30'))
-        if self.t['type'] == 'rescue':
-            q = shlex.quote(self.t['dest'])
-            src[-1] += f' | (mkdir -p {q} && tar -x -f - -C {q})'
-            p1 = subprocess.Popen(src, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            self.proc = [p1]
-        else:
-            p1 = subprocess.Popen(src, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            win = self.t['type'] == 'ssh' and is_windows(split_ssh(self.t['dest'])[0])
-            p2 = subprocess.Popen(dest_cmd(self.t, win), stdin=p1.stdout, stderr=subprocess.DEVNULL)
-            p1.stdout.close()
-            self.proc = [p1, p2]
+        src = ['bash', '-c', reader_cmd('extract', state_args())]
+        p1 = subprocess.Popen(src, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        win = self.t['type'] == 'ssh' and is_windows(split_ssh(self.t['dest'])[0])
+        p2 = subprocess.Popen(dest_cmd(self.t, win), stdin=p1.stdout, stderr=subprocess.DEVNULL)
+        p1.stdout.close()
+        self.proc = [p1, p2]
 
         def feed():
             try:
@@ -489,7 +466,7 @@ def hash_on_target(t, paths):
                     h.update(block)
             out[p] = h.hexdigest()
         return out
-    host, path = (split_ssh(root) if t['type'] == 'ssh' else (RESCUE, root))
+    host, path = split_ssh(root)
     if t['type'] == 'ssh' and is_windows(host):
         script = ("$r='" + path.replace("'", "''").replace('/', '\\') + "'; $items=@('" + "','".join(_b64(p) for p in paths) + "'); "
                   "foreach($b in $items){ $rel=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b)).Replace('/','\\'); "
@@ -502,7 +479,7 @@ def hash_on_target(t, paths):
         if len(res) != len(paths):
             raise RuntimeError(f'target answered for {len(res)} of {len(paths)} files: {r.stderr.strip()[-200:]}')
         return {p: (None if res[_b64(p)] == 'MISSING' else res[_b64(p)]) for p in paths}
-    # Linux target (also the recovery host): sha256sum on the target, names NUL-separated through stdin
+    # Linux target: sha256sum on the target, names NUL-separated through stdin
     q = shlex.quote(path)
     r = subprocess.run(remote_argv(f'cd {q} && xargs -0 -r sha256sum 2>/dev/null', host, ('-o', 'ServerAliveInterval=30')),
                        input='\0'.join(p.lstrip('/') for p in paths).encode('utf-8', 'surrogateescape'),
