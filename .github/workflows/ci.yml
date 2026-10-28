@@ -1,6 +1,6 @@
 # Tests on every push and pull request. The fixture pools (about 30 MB) are not in git: they are the asset fixtures.tar of
-# the release FIXTURES_RELEASE of this repository (made with tests/pack-fixtures.sh). `gh release download` with the
-# workflow's token works for private repositories too.
+# the release named in tests/fixtures/RELEASE (made with `make fixtures-pack`). `make fixtures` uses gh with the
+# workflow's token when the plain download fails, so this works for a private repository too.
 name: tests
 
 on:
@@ -10,9 +10,6 @@ on:
 permissions:
   contents: read
 
-env:
-  FIXTURES_RELEASE: fixtures-1
-
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -21,17 +18,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the portable binaries and check them
-        run: tools/build-portable.sh
+        run: make portable
 
       - name: Fetch the fixture pools
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release download "$FIXTURES_RELEASE" --repo "${{ github.repository }}" --pattern fixtures.tar --dir "$RUNNER_TEMP"
-          tests/fetch-fixtures.sh "$RUNNER_TEMP/fixtures.tar"
+        run: make fixtures GITHUB_REPO="${{ github.repository }}"
 
       - name: Unit and integration tests
-        run: python3 -W error::ResourceWarning -m unittest discover -s tests
+        run: make test
 
       - name: Pipeline on every fixture pool (and the capability matrix)
         run: tests/run.sh --matrix
@@ -39,7 +34,7 @@ jobs:
       - name: The capability matrix is up to date
         run: |
           git diff --exit-code tests/capabilities.json
-          scripts/gen-matrix.py --check
+          dev/gen-matrix.py --check
 
       - name: End to end through the web API
         run: tests/e2e-local.sh

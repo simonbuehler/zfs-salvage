@@ -1,5 +1,5 @@
 {
- "_comment": "Which capability of the README matrix each fixture variant (and its -damaged form) demonstrates. tests/run.sh --matrix turns the runner's results into tests/capabilities.json, scripts/gen-matrix.py renders the README table from that.",
+ "_comment": "Which capability of the README matrix each fixture variant (and its -damaged form) demonstrates. tests/run.sh --matrix turns the runner's results into tests/capabilities.json, dev/gen-matrix.py renders the README table from that.",
  "areas": ["Vdev layout", "Compression", "Checksum", "Blocks", "Dnodes", "Datasets", "Recovery", "Encryption", "Targets"],
  "variants": {
   "legacy-single": [["Vdev layout", "single disk"], ["Compression", "lzjb"], ["Checksum", "fletcher4"], ["Blocks", "16 KiB indirect blocks"], ["Dnodes", "512-byte dnodes"]],

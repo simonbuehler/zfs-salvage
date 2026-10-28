@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Cut the demo video from the recording of demo/record.py: a frame-by-frame compositor (Pillow) that feeds ffmpeg.
+"""Cut the demo video from the recording of dev/demo/record.py: a frame-by-frame compositor (Pillow) that feeds ffmpeg.
 
-Output in demo/build/:
+Output in dev/demo/build/:
   zfs-salvage-demo.mp4           1920x1080, 30 fps, H.264, silent (README, release page)
   zfs-salvage-demo-youtube.mp4   the same with music (generated here, no licence questions)
   zfs-salvage-demo.gif           800x450: only the zoomed key moments (README)

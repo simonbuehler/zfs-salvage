@@ -1,0 +1,10 @@
+{
+  "name": "zfs-salvage",
+  "build": { "dockerfile": "Dockerfile" },
+  // /tmp on a volume: the container's own /tmp is an overlay, which doctor rightly reports as RAM
+  "mounts": ["source=zfs-salvage-tmp,target=/tmp,type=volume"],
+  "postCreateCommand": "sudo chmod 1777 /tmp 2>/dev/null || chmod 1777 /tmp; make build",
+  "customizations": {
+    "vscode": { "extensions": ["ms-python.python"] }
+  }
+}

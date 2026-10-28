@@ -3,7 +3,7 @@
 and a short video. Everything is generated (procedural landscapes, no real photos, no real people), so the demo video
 can be published. Deterministic: the same files every time.
 
-Usage: demo/make-content.py <out dir>      (needs Pillow; the video needs imageio-ffmpeg)
+Usage: dev/demo/make-content.py <out dir>      (needs Pillow; the video needs imageio-ffmpeg)
 Writes <out>/batch1, <out>/batch2 (copied into the pool one after the other, so the pool has older and newer states)
 and <out>/files.json (path, size, sha256, mtime of every file).
 """

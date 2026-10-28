@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Record the demo: a real rescue of the demo pool (demo/build/tank.img.xz) through the web UI, clicked by a browser.
+"""Record the demo: a real rescue of the demo pool (dev/demo/build/tank.img.xz) through the web UI, clicked by a browser.
 
 The browser is Chromium driven by Playwright; frames come from the DevTools screencast (sharp, at 1920x1080), so nothing
 is re-rendered. Headless Chromium has no mouse pointer: a drawn pointer moves to every control before it is clicked.
-Output in demo/build/rec/: frames/*.jpg, frames.json (file, time) and events.json (scene marks, fast-forward ranges),
-which demo/cut.py turns into the video.
+Output in dev/demo/build/rec/: frames/*.jpg, frames.json (file, time) and events.json (scene marks, fast-forward ranges),
+which dev/demo/cut.py turns into the video.
 
-Usage: demo/record.py          (with the Python of the demo environment: Playwright, Pillow)
+Usage: dev/demo/record.py          (with the Python of the demo environment: Playwright, Pillow)
 """
 import json
 import lzma
@@ -21,7 +21,7 @@ import urllib.request
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+ROOT = os.path.dirname(os.path.dirname(HERE))
 BUILD = os.path.join(HERE, 'build')
 REC = os.path.join(BUILD, 'rec')
 WORK = os.path.expanduser('~/zfs-demo')               # paths in here appear in the video: keep them plain

@@ -1,0 +1,36 @@
+name: Pool not supported
+description: make-case or doctor refuses your pool, or the scan finds nothing usable
+labels: [pool-support]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks: reports like this decide what gets supported next. Before you paste anything, replace pool,
+        dataset and file names you do not want to publish (the structure matters, the names do not).
+  - type: textarea
+    id: make-case
+    attributes:
+      label: Output of `./zfs-salvage make-case --dev …`
+      description: The whole output, including the compatibility and diagnosis lines.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `./zfs-salvage doctor --json`
+      render: json
+  - type: textarea
+    id: pool
+    attributes:
+      label: The pool
+      description: How it was created (OpenZFS version, layout, compression, encryption) and what happened to it.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: zfs-salvage version
+      description: "`./zfs-salvage version`"
+    validations:
+      required: true

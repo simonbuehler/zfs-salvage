@@ -8,8 +8,6 @@
 build/
 *.tar
 *.tar.*
-*.ko
-*.pkg.tar.zst
 tools/zscan/zscan
 tools/libzsalvage/libzsalvage.so
 __pycache__/
@@ -39,4 +37,4 @@ catalog/transfers/
 catalog/transfer_preset.json
 
 # demo video: generated content, pool, recording and cut
-demo/build/
+dev/demo/build/

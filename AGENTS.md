@@ -45,13 +45,14 @@ status_page.py                             -> <data>/status/index.html, workflow
    classification). The vdev mapping is in `zsread.py` `read_bp`. Dnode and attribute parsing are
    in `zsread.py` `Dnode` / `ZPL`.
 2. Implement it with a pure-Python fallback where the reader has one.
-3. Test against a **small pool image** that has the feature: create it with
-   `truncate -s 256M img && zpool create -o ashift=9 -O compression=<x> test /path/img`, write
-   known files, export, then run zscan + `zsread.py tree`/`extract` with
-   `ZSREAD_DEVS=/path/img` and compare SHA-256 sums. To simulate the target situation, overwrite the
-   dataset's objset block (find it with `zdb -dddd`) and check that the tree is still found.
-4. Add a fixture variant for it to `tests/capability_map.json` (the README's capability matrix is generated from the
-   test results: `tests/run.sh --matrix`, `scripts/gen-matrix.py --write`) and update `SUPPORTED` / `REFUSALS` in `make-case.py`.
+3. Add a fixture variant that has the feature to `tests/make_fixtures.py` and build the pools
+   (`make fixtures-regen`; on WSL or without the ZFS module this runs in the test VM). Every variant
+   also gets a damaged form with the dataset's objset block destroyed, so the tests check that the tree
+   is still found. Quick experiments without the fixture machinery: run zscan and
+   `zsread.py tree`/`extract` on an image with `ZSREAD_DEVS=/path/img` and compare SHA-256 sums.
+4. Map the variant to a capability in `tests/capability_map.json`, regenerate the README matrix
+   (`make matrix`) and update `SUPPORTED` / `REFUSALS` in `make-case.py`.
+5. `make test-full` must pass. Setup and the levels of testing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Conventions
 

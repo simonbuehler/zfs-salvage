@@ -10,7 +10,7 @@ import unittest
 
 import fx  # noqa: I001 - first: puts scripts/ on the path
 
-GEN = os.path.join(fx.SCRIPTS, 'gen-matrix.py')
+GEN = os.path.join(fx.REPO, 'dev', 'gen-matrix.py')
 _spec = importlib.util.spec_from_file_location('gen_matrix', GEN)
 gm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gm)

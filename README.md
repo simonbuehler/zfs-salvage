@@ -98,7 +98,7 @@ The steps in detail:
 | Targets | a disk on this machine (WSL drive letters too), SSH to Linux/Windows | — |
 <!-- capability-matrix:end -->
 
-The table is generated from the pipeline tests (`tests/run.sh --matrix`, `scripts/gen-matrix.py`): *Supported* is what
+The table is generated from the pipeline tests (`tests/run.sh --matrix`, `dev/gen-matrix.py`): *Supported* is what
 extracts byte-exact from the test pools (for most of them also with the object set block destroyed); *Not yet* are the tests that are expected to fail and the features
 without a test pool.
 
@@ -121,8 +121,9 @@ the web UI opens in its browser.
    `blockdev --setro`, check with `zdb -l disk.img`.
 3. **Attach and mount the disk that will hold the rescued files** (a click in the file manager is
    enough). It must be a real disk, not the live system itself: that lives in RAM and is gone after a reboot.
-4. **Download the release bundle onto that disk** and unpack it there:
-   `tar xzf zfs-salvage-*.tar.gz && cd zfs-salvage-*`
+4. **Download the release bundle onto that disk:** `zfs-salvage-<version>.tar.gz` and `SHA256SUMS` from the
+   [releases page](https://github.com/simonbuehler/zfs-salvage/releases). Check and unpack it there:
+   `sha256sum -c SHA256SUMS --ignore-missing && tar xzf zfs-salvage-*.tar.gz && cd zfs-salvage-*`
 5. **Check the machine:** `sudo ./zfs-salvage doctor`. Fix every `FAIL` ([Troubleshooting](#troubleshooting)).
    `zdb` comes with the live image; if it is missing: `sudo apt install zfsutils-linux`.
    Warnings about missing devices and a missing case file are normal at this point.
@@ -233,29 +234,6 @@ It names the reason and what to try instead. `--force` writes the case file anyw
 | the target dataset's data is compressed with X, which zfs-salvage cannot decompress yet: its files would be unreadable | Support for zstd and gzip is planned. If the pool still opens in a current OpenZFS, use ZFS itself on an image of the disks. |
 | the target dataset's data uses the X checksum, which zfs-salvage cannot verify yet | Support is planned. If the pool still opens in a current OpenZFS, use ZFS itself on an image of the disks. |
 
-## Repository layout
-
-| Path | Purpose |
-|---|---|
-| `zfs-salvage` | launcher: `doctor`, `make-case`, `scan`, `rank`, `web`, or just `sudo ./zfs-salvage` |
-| `scripts/doctor.py` | the machine check behind `./zfs-salvage doctor` |
-| `tools/zscan/` | raw-device scanner (static C binary) |
-| `tools/libzsalvage/` | fletcher4, lzjb, verified block reads (C, used via ctypes) |
-| `scripts/zsread.py` | userspace ZFS reader: `probe`, `tree`, `batch`, `extract` |
-| `scripts/scan-device.sh` | chunked, resumable scan driver |
-| `scripts/rank-trees.py` | candidate verification and ranking |
-| `scripts/catalog.py` | tree listing → SQLite catalog |
-| `scripts/web.py`, `scripts/ui/` | web UI (status, selection, transfer); regenerates the status page |
-| `scripts/status_page.py` | status page and chain diagram |
-| `scripts/transfer.py` | transfer jobs, target checks, manifests |
-| `scripts/common.py` | shared settings: case file, paths |
-| `scripts/make-case.py` | case file generator |
-| `scripts/make-bundle.sh` | release tarball with prebuilt binaries |
-| `tools/build-portable.sh` | builds `zscan` (static) and `libzsalvage.so` for glibc 2.17 and newer (Docker) |
-| `scripts/diag/` | zdb survey per TXG; objset block inspector |
-| `cases/` | case files (pool profile, timeline, target); `example.json` shows the format |
-| `docs/` | design notes, the case analysis, issue archive |
-
 ## Case study
 
 A Gentoo NAS crashed in October 2014 (ZFS 0.6.3, mirror on LUKS). Afterwards `rpool/home`
@@ -273,11 +251,12 @@ A Gentoo NAS crashed in October 2014 (ZFS 0.6.3, mirror on LUKS). Afterwards `rp
 
 Details: [docs/design.md](docs/design.md).
 
-## Extending it
+## Contributing
 
-See [AGENTS.md](AGENTS.md) for the architecture, invariants and how to add a feature (written
-for humans and AI coding assistants alike). The reader is small and table-driven. Typical next steps are raidz column mapping, zstd and gang blocks. Each feature needs one test against a known
-pool image. Add the feature to the capability matrix and to the compatibility check in `make-case.py`.
+The development setup (tests, fixture pools, the test VM, releases) is in [CONTRIBUTING.md](CONTRIBUTING.md); the
+invariants, the architecture and how to add a format feature are in [AGENTS.md](AGENTS.md), written for humans and
+AI coding assistants alike. The reader is small and table-driven. Typical next steps are raidz column mapping, zstd
+and gang blocks; each one needs a fixture pool that has the feature, and the capability matrix above changes with it.
 
 ## License
 

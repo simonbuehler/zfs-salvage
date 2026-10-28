@@ -5,15 +5,15 @@ tests/run.sh --matrix writes tests/capabilities.json (what each fixture variant 
 which capability each variant stands for. This script turns both into the table between the markers
 `<!-- capability-matrix:start -->` and `<!-- capability-matrix:end -->` of README.md.
 
-Usage: scripts/gen-matrix.py           print the table
-       scripts/gen-matrix.py --write   update README.md
-       scripts/gen-matrix.py --check   exit 1 if README.md is out of date (CI)
+Usage: dev/gen-matrix.py           print the table
+       dev/gen-matrix.py --write   update README.md
+       dev/gen-matrix.py --check   exit 1 if README.md is out of date (CI)
 """
 import json
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # dev/ -> repository
 START, END = '<!-- capability-matrix:start -->', '<!-- capability-matrix:end -->'
 
 
@@ -62,7 +62,7 @@ def main(argv):
         text = f.read()
     if '--check' in argv:
         if current(text) != want:
-            print('README.md: the capability matrix is out of date; run scripts/gen-matrix.py --write', file=sys.stderr)
+            print('README.md: the capability matrix is out of date; run dev/gen-matrix.py --write', file=sys.stderr)
             return 1
         print('README.md: capability matrix is up to date')
         return 0

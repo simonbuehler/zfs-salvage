@@ -2,7 +2,7 @@
 # Build a release tarball: the generic tool only (no case files, logs or case documents),
 # with prebuilt zscan and libzsalvage.so so that users need no compiler or Docker.
 #
-# Usage: scripts/make-bundle.sh            -> build/zfs-salvage-<version>.tar.gz
+# Usage: dev/make-bundle.sh            -> build/zfs-salvage-<version>.tar.gz
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"

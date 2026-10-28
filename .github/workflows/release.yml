@@ -1,0 +1,41 @@
+# A tag vX.Y.Z on main publishes a release: the portable binaries are built, every test runs on the fixture pools,
+# and the bundle (dev/make-bundle.sh) with its SHA256SUMS becomes the release asset users download.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build the portable binaries and check them
+        run: make portable
+
+      - name: Fetch the fixture pools
+        run: make fixtures GITHUB_REPO="${{ github.repository }}"
+
+      - name: All tests
+        run: |
+          make test
+          tests/run.sh
+          tests/e2e-local.sh
+
+      - name: Bundle and checksums
+        run: |
+          dev/make-bundle.sh
+          cd build && sha256sum zfs-salvage-*.tar.gz > SHA256SUMS
+
+      - name: Publish the release
+        run: gh release create "$GITHUB_REF_NAME" build/zfs-salvage-*.tar.gz build/SHA256SUMS --title "zfs-salvage $GITHUB_REF_NAME" --generate-notes

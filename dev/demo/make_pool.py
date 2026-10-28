@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the demo pool "tank" from demo/build/content (run as root with ZFS, normally in the test VM:
-tests/vm/run.sh demo/make-pool.sh).
+"""Build the demo pool "tank" from dev/demo/build/content (run as root with ZFS, normally in the test VM:
+tests/vm/run.sh dev/demo/make-pool.sh).
 
 The two batches of files are written in separate transactions, so the pool has older and newer states; then every copy of
-the object set block of tank/home is destroyed – the damage zfs-salvage works around. Output in demo/build/:
+the object set block of tank/home is destroyed – the damage zfs-salvage works around. Output in dev/demo/build/:
 tank.img.xz (the damaged pool), tank.json (pool facts and the damage spec).
 """
 import json
@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'tests'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), 'tests'))
 import make_fixtures as mf  # noqa: E402
 
 BUILD = os.path.join(HERE, 'build')

@@ -1,14 +1,14 @@
 # Demo video
 
 A real rescue, recorded in the browser, of a pool with invented content (no real photos or people), so it can be
-published. Everything is regenerated with four commands; the results land in `demo/build/` (not in git).
+published. Everything is regenerated with four commands; the results land in `dev/demo/build/` (not in git).
 
 | Step | Command | Needs |
 |---|---|---|
-| 1. Content | `demo/make-content.py` | Python with Pillow and imageio-ffmpeg |
-| 2. Pool | `tests/vm/run.sh demo/make-pool.sh` | the test VM (Docker, KVM); builds pool `tank`, destroys the objset block of `tank/home` |
-| 3. Recording | `demo/record.py` | Playwright with Chromium, the `zfs-salvage-zdb` image (labels are read with real zdb once) |
-| 4. Cut | `demo/cut.py` | imageio-ffmpeg |
+| 1. Content | `dev/demo/make-content.py` | Python with Pillow and imageio-ffmpeg |
+| 2. Pool | `tests/vm/run.sh dev/demo/make-pool.sh` | the test VM (Docker, KVM); builds pool `tank`, destroys the objset block of `tank/home` |
+| 3. Recording | `dev/demo/record.py` | Playwright with Chromium, the `zfs-salvage-zdb` image (labels are read with real zdb once) |
+| 4. Cut | `dev/demo/cut.py` | imageio-ffmpeg |
 
 Steps 1, 3 and 4 run with one Python environment, e.g.
 `python3 -m venv ~/.cache/zfs-salvage-demo-venv && ~/.cache/zfs-salvage-demo-venv/bin/pip install playwright imageio-ffmpeg pillow && ~/.cache/zfs-salvage-demo-venv/bin/playwright install chromium`.

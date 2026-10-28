@@ -31,25 +31,41 @@ class Workflow(unittest.TestCase):
         self.assertEqual(w['permissions'], {'contents': 'read'})
         self.assertIn('push', w[True] if True in w else w['on'])          # PyYAML reads the key `on` as True
 
-    def test_every_script_it_runs_exists(self):
+    def test_every_script_and_make_target_it_runs_exists(self):
         text = '\n'.join(s.get('run', '') for s in workflow()['jobs']['test']['steps'])
-        paths = set(re.findall(r'(?:^|\s)((?:tests|tools|scripts)/[\w./-]+\.(?:sh|py))', text))
-        self.assertGreaterEqual(len(paths), 5, paths)
+        paths = set(re.findall(r'(?:^|\s)((?:tests|tools|scripts|dev)/[\w./-]+\.(?:sh|py))', text))
+        self.assertGreaterEqual(len(paths), 3, paths)
         for p in paths:
             self.assertTrue(os.access(os.path.join(fx.REPO, p), os.X_OK), f'{p} is missing or not executable')
+        with open(os.path.join(fx.REPO, 'Makefile')) as f:
+            targets = set(re.findall(r'^([\w-]+):', f.read(), re.M))
+        used = set(re.findall(r'\bmake ([\w-]+)', text))
+        self.assertTrue(used, 'the workflow uses the Makefile')
+        self.assertLessEqual(used, targets)
 
     def test_it_runs_the_whole_chain_in_order(self):
         runs = [s.get('run', '') for s in workflow()['jobs']['test']['steps']]
         joined = '\n'.join(runs)
-        order = ['tools/build-portable.sh', 'tests/fetch-fixtures.sh', 'unittest discover', 'tests/run.sh --matrix',
-                 'git diff --exit-code tests/capabilities.json', 'scripts/gen-matrix.py --check', 'tests/e2e-local.sh']
+        order = ['make portable', 'make fixtures', 'make test', 'tests/run.sh --matrix',
+                 'git diff --exit-code tests/capabilities.json', 'dev/gen-matrix.py --check', 'tests/e2e-local.sh']
         positions = [joined.index(x) for x in order]
         self.assertEqual(positions, sorted(positions))
 
     def test_fixtures_come_from_the_repository_s_own_release(self):
         step = next(s for s in workflow()['jobs']['test']['steps'] if s.get('name') == 'Fetch the fixture pools')
-        self.assertIn('gh release download "$FIXTURES_RELEASE" --repo "${{ github.repository }}"', step['run'])
+        self.assertIn('make fixtures GITHUB_REPO="${{ github.repository }}"', step['run'])
         self.assertEqual(step['env']['GH_TOKEN'], '${{ github.token }}', 'works for private repositories too')
+        with open(os.path.join(fx.TESTS, 'fixtures', 'RELEASE')) as f:
+            self.assertRegex(f.read().strip(), r'^fixtures-\d+$')
+
+    def test_release_workflow_publishes_the_bundle_on_a_tag(self):
+        with open(os.path.join(fx.REPO, '.github', 'workflows', 'release.yml')) as f:
+            w = yaml.safe_load(f)
+        self.assertEqual((w[True] if True in w else w['on'])['push']['tags'], ['v*'])
+        self.assertEqual(w['permissions'], {'contents': 'write'})
+        joined = '\n'.join(s.get('run', '') for s in w['jobs']['release']['steps'])
+        order = ['make portable', 'make fixtures', 'make test', 'tests/run.sh', 'dev/make-bundle.sh', 'sha256sum', 'gh release create']
+        self.assertEqual([joined.index(x) for x in order], sorted(joined.index(x) for x in order))
 
 
 class FixtureAsset(unittest.TestCase):
