@@ -11,7 +11,7 @@ for f in tools/zscan/zscan tools/libzsalvage/libzsalvage.so; do
     [ -f "$f" ] || { echo "missing $f – run ${f%/*}/build.sh first"; exit 1; }
 done
 tools/check-portable.sh || { echo "the binaries are not portable – run tools/build-portable.sh"; exit 1; }
-VERSION="$(git describe --tags --always --dirty 2>/dev/null || date +%Y%m%d)"
+VERSION="$(git describe --tags --match 'v[0-9]*' --always --dirty 2>/dev/null || date +%Y%m%d)"     # release tags only (fixtures-N tags share commits)
 NAME="zfs-salvage-$VERSION"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
