@@ -7,7 +7,7 @@ published. Everything is regenerated with four commands; the results land in `de
 |---|---|---|
 | 1. Content | `dev/demo/make-content.py` | Python with Pillow and imageio-ffmpeg |
 | 2. Pool | `tests/vm/run.sh dev/demo/make-pool.sh` | the test VM (Docker, KVM); builds pool `tank`, destroys the objset block of `tank/home` |
-| 3. Recording | `dev/demo/record.py` | Playwright with Chromium, the `zfs-salvage-zdb` image (labels are read with real zdb once) |
+| 3. Recording | `dev/demo/record.py` | Playwright with Chromium, the `zfs-salvage-zdb` image (labels are read with real zdb once) and the dev container image `zfs-salvage-dev` (the web UI runs in it, with the target disk at /mnt/target as on a live system) |
 | 4. Cut | `dev/demo/cut.py` | imageio-ffmpeg |
 
 Steps 1, 3 and 4 run with one Python environment, e.g.

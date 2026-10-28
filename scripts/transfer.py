@@ -76,7 +76,10 @@ def _linux_places(host):
         c = line.split(' ')
         if len(c) >= 4 and c[2] in REAL_FS and c[1].isdigit() and 'ro' not in c[3].split(',') \
                 and not c[0].startswith(('/boot', '/run/archiso')):
-            res.append({'path': c[0].replace('\\x20', ' '), 'free': int(c[1]), 'fs': c[2]})
+            path = c[0].replace('\\x20', ' ')
+            if host == 'local' and not os.path.isdir(path):     # single files mounted into a container (/etc/hosts)
+                continue
+            res.append({'path': path, 'free': int(c[1]), 'fs': c[2]})
     return res
 
 

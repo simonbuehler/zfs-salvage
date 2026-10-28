@@ -5,5 +5,5 @@ FROM ubuntu:24.04
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       python3 python3-yaml gcc libc6-dev make git curl ca-certificates xz-utils \
-      zfsutils-linux util-linux smartmontools \
+      zfsutils-linux util-linux procps smartmontools \
  && rm -rf /var/lib/apt/lists/*

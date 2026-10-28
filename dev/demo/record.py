@@ -24,7 +24,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 BUILD = os.path.join(HERE, 'build')
 REC = os.path.join(BUILD, 'rec')
-WORK = os.path.expanduser('~/zfs-demo')               # paths in here appear in the video: keep them plain
+WORK = os.path.expanduser('~/zfs-demo')               # the working folder on this machine ...
+SHOWN = '/mnt/target'                                 # ... and where the server (in a container) sees it: in the video
+IMAGE = 'zfs-salvage-dev'                             # the dev container image (.devcontainer/Dockerfile)
 TOKEN = 'demo-session'
 PORT = 8799
 
@@ -80,16 +82,20 @@ def prepare():
         with open(f'{WORK}/bin/zdb{flag}.txt', 'w') as f:
             f.write(rec[flag])
     with open(f'{WORK}/bin/zdb', 'w') as f:
-        f.write(f'#!/bin/bash\ncase "$1" in -l|-luuuu) exec cat "{WORK}/bin/zdb$1.txt";; *) exit 1;; esac\n')
+        f.write(f'#!/bin/bash\ncase "$1" in -l|-luuuu) exec cat "{SHOWN}/bin/zdb$1.txt";; *) exit 1;; esac\n')
     os.chmod(f'{WORK}/bin/zdb', 0o755)
-    return img
+    return f'{SHOWN}/disks/old-nas-disk.img'
 
 
 def start_server():
-    env = {k: v for k, v in os.environ.items() if not k.startswith('ZFS_SALVAGE_')}
-    env.update(ZFS_SALVAGE_STATE_DIR=f'{WORK}/data', ZFS_SALVAGE_TOKEN=TOKEN, SALVAGE_UI_PORT=str(PORT),
-               ZFS_SALVAGE_ZDB=f'{WORK}/bin/zdb', ZFS_SALVAGE_SMARTCTL='/nonexistent', ZFS_SALVAGE_DOCTOR_FAKE='{"lsblk": ""}')
-    proc = subprocess.Popen([os.path.join(ROOT, 'zfs-salvage'), 'web'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    """The web UI in a container, like on a live system: the target disk at /mnt/target, no drives of this machine."""
+    env = dict(HOME=SHOWN, ZFS_SALVAGE_STATE_DIR=f'{SHOWN}/data', ZFS_SALVAGE_TOKEN=TOKEN, SALVAGE_UI_PORT=str(PORT),
+               ZFS_SALVAGE_ZDB=f'{SHOWN}/bin/zdb', ZFS_SALVAGE_SMARTCTL='/nonexistent', ZFS_SALVAGE_DOCTOR_FAKE='{"lsblk": ""}')
+    subprocess.run(['docker', 'rm', '-f', 'zfs-salvage-demo'], capture_output=True)
+    proc = subprocess.Popen(['docker', 'run', '--rm', '--name', 'zfs-salvage-demo', '--network', 'host',
+                             '--user', f'{os.getuid()}:{os.getgid()}', '-v', f'{WORK}:{SHOWN}', '-v', f'{ROOT}:/opt/zfs-salvage:ro',
+                             *[a for k, v in env.items() for a in ('-e', f'{k}={v}')], IMAGE, '/opt/zfs-salvage/zfs-salvage', 'web'],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(100):
         try:
             socket.create_connection(('127.0.0.1', PORT), timeout=1).close()
@@ -175,7 +181,7 @@ class Rec:
             json.dump(self.events, f)
 
 
-def gallery(dest):
+def gallery(dest, shown):
     """A last page: the rescued photos, as files on the target disk."""
     pics = []
     for dirpath, _, names in os.walk(dest):
@@ -187,7 +193,7 @@ body{{margin:0;background:#151614;color:#e8e8e3;font:20px system-ui,sans-serif}}
 p{{margin:0 34px 18px;color:#9a9a93}} .g{{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;padding:0 34px}}
 img{{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:6px}}</style>
 <h1>All {len(pics) + videos} photos and videos are back on a safe disk</h1>
-<p>{dest} · original names and dates · every block checked against its ZFS checksum, every file hashed again on the target</p>
+<p>{shown} · original names and dates · every block checked against its ZFS checksum, every file hashed again on the target</p>
 <div class="g">{cells}</div>'''
     path = f'{WORK}/gallery.html'
     with open(path, 'w') as f:
@@ -199,7 +205,7 @@ def main():
     shutil.rmtree(REC, ignore_errors=True)
     img = prepare()
     server = start_server()
-    dest = f'{WORK}/Rescued'
+    dest = f'{SHOWN}/Rescued'
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch()
@@ -293,14 +299,14 @@ def main():
 
             # ---- the rescued photos
             r.mark('gallery')
-            page.goto('file://' + gallery(dest))
+            page.goto('file://' + gallery(f'{WORK}/Rescued', dest))
             r.hold(6)
             r.mark('end')
             r.save()
             browser.close()
     finally:
-        server.terminate()
-        server.wait(timeout=20)
+        subprocess.run(['docker', 'stop', 'zfs-salvage-demo'], capture_output=True)
+        server.wait(timeout=30)
     print(f'{len(r.frames)} frames, {r.events[-1][1] - r.events[0][1]:.0f} s, scenes {[e[0] for e in r.events]}')
 
 

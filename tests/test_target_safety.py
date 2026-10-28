@@ -27,7 +27,7 @@ class Target(unittest.TestCase):
             json.dump({'pool': {'devices': [{'path': p, 'vdev': 0} for p in pool]}, 'target': {'dataset': 'p/x'}}, f)
         env = {k: v for k, v in os.environ.items() if k != 'ZFS_SALVAGE_ALLOW_RAM_TARGET'}
         env.update(ZFS_SALVAGE_CASE=os.path.join(self.dir, 'case.json'), ZFS_SALVAGE_STATE_DIR=self.dir,
-                   ZFS_SALVAGE_CATALOG_DIR=os.path.join(self.dir, 'catalog'), 
+                   ZFS_SALVAGE_CATALOG_DIR=os.path.join(self.dir, 'catalog'),
                    ZFS_SALVAGE_SMARTCTL=SMARTCTL, FAKE_SMART=smart, ZFS_SALVAGE_DOCTOR_FAKE=json.dumps(fake))
         code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import transfer; "
                 f"print(json.dumps(transfer.{fn}({{'type': 'local', 'dest': sys.argv[2]}})))")
@@ -90,6 +90,31 @@ class Target(unittest.TestCase):
         self.assertEqual(r['state'], 'refused')
         self.assertIn('in RAM', r['info'])
         self.assertFalse(os.path.exists(os.path.join(self.dir, 'catalog', 'transfers')), 'no job may be created')
+
+
+class Places(unittest.TestCase):
+    """The suggested targets: mounted file systems that are directories, writable and on a real disk."""
+
+    def test_only_writable_directories_are_suggested(self):
+        d = tempfile.mkdtemp()
+        try:
+            disk, single_file = os.path.join(d, 'target'), os.path.join(d, 'hosts')
+            os.makedirs(disk)
+            open(single_file, 'w').close()
+            with open(os.path.join(d, 'findmnt'), 'w') as f:      # what findmnt shows inside a container
+                f.write(f'#!/bin/sh\necho "{disk} 1000 ext4 rw"\necho "{single_file} 1000 ext4 rw"\n'
+                        f'echo "/mnt/ro 1000 ext4 ro"\necho "/run 1000 tmpfs rw"\n')
+            os.chmod(os.path.join(d, 'findmnt'), 0o755)
+            env = dict(os.environ, PATH=d + os.pathsep + os.environ['PATH'], HOME=disk, ZFS_SALVAGE_STATE_DIR=d)
+            code = "import json, sys; sys.path.insert(0, sys.argv[1]); import transfer; print(json.dumps(transfer.places('local')))"
+            r = subprocess.run([sys.executable, '-I', '-c', code, fx.SCRIPTS], capture_output=True, text=True, env=env, timeout=60)
+            paths = [p['path'] for p in json.loads(r.stdout)]
+            self.assertIn(disk, paths)
+            self.assertNotIn(single_file, paths)
+            self.assertNotIn('/mnt/ro', paths)
+            self.assertNotIn('/run', paths)
+        finally:
+            fx.rmtree(d)
 
 
 if __name__ == '__main__':
