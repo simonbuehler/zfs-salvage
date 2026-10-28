@@ -5,19 +5,19 @@ LABEL 0
     name: 'fx-modern-single'
     state: 1
     txg: 58
-    pool_guid: 5625899067104890805
+    pool_guid: 16005914242931148809
     errata: 0
-    hostid: 206356055
+    hostid: 1888437510
     hostname: 'ubuntu'
-    top_guid: 7983843966087504310
-    guid: 7983843966087504310
+    top_guid: 470781353943189727
+    guid: 470781353943189727
     vdev_children: 1
     vdev_tree:
         type: 'file'
         id: 0
-        guid: 7983843966087504310
+        guid: 470781353943189727
         path: '/var/tmp/zfs-salvage-fixtures/modern-single/d0.img'
-        metaslab_array: 69
+        metaslab_array: 133
         metaslab_shift: 24
         ashift: 12
         asize: 129499136

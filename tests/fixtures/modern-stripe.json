@@ -437,24 +437,24 @@
   "mos": {
    "type": "META",
    "id": 0,
-   "objects": 57,
+   "objects": 58,
    "size": "324K"
   },
   "fx-modern-stripe/home": {
    "type": "ZPL",
-   "id": 387,
+   "id": 75,
    "objects": 74,
    "size": "5.74M",
-   "rootbp": "DVA[0]=<0:441000:1000> DVA[1]=<1:431000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=23L/23P fill=74 cksum=000000106772c5dc:00002bd66d527970:003e470b4896fa64:3e85b61989e28a80",
+   "rootbp": "DVA[0]=<0:452000:1000> DVA[1]=<1:438000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=23L/23P fill=74 cksum=0000000ff6bc7655:00002a6f4c53ec5e:003bf122fec07185:3bde1661ed583491",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 4460544,
+     "offset": 4530176,
      "asize": 4096
     },
     {
      "vdev": 1,
-     "offset": 4395008,
+     "offset": 4423680,
      "asize": 4096
     }
    ],
@@ -478,28 +478,28 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:43f000:1000 20000L/1000P F=74 B=23/23 cksum=000000850548095c:0001e8927fa738fa:0383b9f9b02ce74e:53a31da3dca6ec92",
-  "0  L4     1:42e000:1000 20000L/1000P F=74 B=23/23 cksum=0000008574532907:0001ea3f2172dafb:0386f5c6b4834664:57cd9822916b2636",
-  "0   L3    1:42d000:1000 20000L/1000P F=74 B=23/23 cksum=00000083d2642805:0001e42e04da164f:037b9f132162039f:49986c72bd78b1aa",
-  "0    L2   0:43c000:1000 20000L/1000P F=74 B=23/23 cksum=00000086ccd42baa:0001ef917bd6068d:03917e211bc223e4:65b6c44889d4f078",
-  "0     L1  1:42b000:1000 20000L/1000P F=74 B=23/23 cksum=0000008fcf625476:0001f9272eb2b5fb:037a7bce37baf9d7:1a5f74dd6fb14a6a",
-  "0      L0 0:436000:1000 4000L/1000P F=31 B=23/23 cksum=0000009d53c96629:00017f5d8bb7faa8:020bc59d8df89665:07d5839eafb7586a",
-  "4000      L0 0:438000:1000 4000L/1000P F=32 B=23/23 cksum=000000b659d04f06:0001a5eca1093eb9:02346cda422df5f5:2b79df37e51f0576",
-  "8000      L0 0:43a000:1000 4000L/1000P F=6 B=23/23 cksum=0000003341a7271a:0000b4051c9f204e:013e868fcbe85acb:7a8f929d7b6367e4",
-  "10000      L0 0:439000:1000 4000L/1000P F=5 B=23/23 cksum=00000027c0b059b8:000090d9c3fb5ee4:0109056fff1ca9b4:44a0836f46d073d7"
+  "0 L5      0:450000:1000 20000L/1000P F=74 B=23/23 cksum=00000084210231df:0001e4dccf6dbe5c:037c114ff9d43854:4928160b09e38800",
+  "0  L4     1:435000:1000 20000L/1000P F=74 B=23/23 cksum=000000849991e18d:0001e737dd695cf5:038191e79d86df40:5160cacc79af6828",
+  "0   L3    0:44e000:1000 20000L/1000P F=74 B=23/23 cksum=00000085a8b2edfd:0001eb5e684e00b7:0389b5fc04a45275:5c08a1028717c800",
+  "0    L2   0:44d000:1000 20000L/1000P F=74 B=23/23 cksum=0000008617869a1a:0001ed10f80fdf95:038d0acbdae5ddbb:606576c41eefb688",
+  "0     L1  0:44c000:1000 20000L/1000P F=74 B=23/23 cksum=00000090a201d777:000200e1b1d4b771:0390b2e1c7d799b4:3ec7e2d62cc6a100",
+  "0      L0 0:449000:1000 4000L/1000P F=31 B=23/23 cksum=0000009fbef15ee3:0001862567e5dcef:0215e1b00acb8bb3:1307b628de0fc0e9",
+  "4000      L0 0:44a000:1000 4000L/1000P F=27 B=23/23 cksum=000000a4d58d2a8e:0001ac65c7152132:025eac8851678785:64f3022403047246",
+  "10000      L0 0:44b000:1000 4000L/1000P F=11 B=23/23 cksum=0000005aecf27d2d:000127d1ff1bdab3:01eadce61649e588:294b8e7690ed71fe",
+  "20000      L0 0:448000:1000 4000L/1000P F=5 B=23/23 cksum=0000002b027d91cb:00009d4671c38636:0120be829d1c2c6f:62db396d62956356"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 8654848,
+    "offset": 8724480,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d1.img",
-    "offset": 8589312,
+    "offset": 8617984,
     "length": 4096,
     "seed": 1001
    }
@@ -507,8 +507,8 @@
   "zdb_error": "failed to hold dataset 'fx-modern-stripe/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-stripe/home': Input/output error | zdb: can't open 'fx-modern-stripe/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "22e04a6b17652652fe2825327b653181b9430b64e8e7f4ad855c07b52ecb6adb",
-  "d1.img": "4d19283fad637c32c829c29e21c67c5be5064bbc809d13c72f774640e6a80d12"
+  "d0.img": "a56feb807f63d863767112b3114eac40e4107ad2823a9c998dc4eb3c87684f39",
+  "d1.img": "e72b2536d800a31a3198c7c11e90574c76ef496048aaa6a07a0c6491af33404e"
  },
- "seconds": 13.3
+ "seconds": 12.7
 }

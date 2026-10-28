@@ -439,23 +439,23 @@
    "type": "META",
    "id": 0,
    "objects": 55,
-   "size": "324K"
+   "size": "312K"
   },
   "fx-modern-mirror/home": {
    "type": "ZPL",
-   "id": 260,
+   "id": 132,
    "objects": 74,
    "size": "5.71M",
-   "rootbp": "DVA[0]=<0:307c000:1000> DVA[1]=<0:130c000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=0000000917189634:000019c93974340e:002736a5139b0fef:2a3997ebcf2ffb11",
+   "rootbp": "DVA[0]=<0:308e000:1000> DVA[1]=<0:131f000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=000000100edbd6da:00002bb96f52911b:003f80d017018817:414b4503d589af10",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 50839552,
+     "offset": 50913280,
      "asize": 4096
     },
     {
      "vdev": 0,
-     "offset": 19972096,
+     "offset": 20049920,
      "asize": 4096
     }
    ],
@@ -479,40 +479,41 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:307a000:1000 20000L/1000P F=74 B=44/44 cksum=000000875243d921:0001f22c4b470174:039793edc95ab469:6ed03f0c6ef13956",
-  "0  L4     0:3079000:1000 20000L/1000P F=74 B=44/44 cksum=00000087f2e0a5b2:0001f4a4f31e3499:039c73320ce5802e:7539305e2d8afed7",
-  "0   L3    0:3078000:1000 20000L/1000P F=74 B=44/44 cksum=000000886a42e381:0001f679ca4589d1:03a00cb489bf9ac6:79f1dc1629fcb2ce",
-  "0    L2   0:3077000:1000 20000L/1000P F=74 B=44/44 cksum=00000085ffade9a7:0001ecf4e8455f96:038d47e6d8f9d7d9:613fcd297debf67d",
-  "0     L1  0:3076000:1000 20000L/1000P F=74 B=44/44 cksum=0000009234014c9d:0002073d4f79c316:039d8edebe452313:501b7578145078a6",
-  "0      L0 0:3070000:1000 4000L/1000P F=31 B=44/44 cksum=000000a3e677ea30:00019c0973adb740:023de4970206e214:3f1c392493084666",
-  "4000      L0 0:3075000:1000 4000L/1000P F=32 B=44/44 cksum=000000af668600ef:0001ae646a4194fa:0252b7b647c85678:5320b00bd335ec58",
-  "8000      L0 0:306f000:1000 4000L/1000P F=4 B=44/44 cksum=00000026fbd4e0ed:00008eece410429b:01071e8d32689664:444f24c5884d9889",
-  "10000      L0 0:23a000:1000 4000L/1000P F=7 B=15/15 cksum=0000003bb20bd601:0000cea03a3f1022:0168c7992eeec021:a7acaa614389fc9d"
+  "0 L5      0:308c000:1000 20000L/1000P F=74 B=44/44 cksum=00000087eeb4877c:0001f4999c6d5d41:039c67071513c25a:7536c40ee97c3a9a",
+  "0  L4     0:308b000:1000 20000L/1000P F=74 B=44/44 cksum=00000087d70276bc:0001f43d48c82269:039bb2fc24fc51d0:744c7a578af0e8e0",
+  "0   L3    0:308a000:1000 20000L/1000P F=74 B=44/44 cksum=00000087458f476a:0001f203356aaa29:039754b840abb6a2:6e94a778090e4f55",
+  "0    L2   0:3089000:1000 20000L/1000P F=74 B=44/44 cksum=00000086726eb687:0001ef15e9b1c544:03921c5b74b92406:68575860caca58b1",
+  "0     L1  0:3088000:1000 20000L/1000P F=74 B=44/44 cksum=00000098026fd4e9:0002152674b9c18c:03aaf4769309f902:5327b858132499fc",
+  "0      L0 0:3081000:1000 4000L/1000P F=31 B=44/44 cksum=000000a65ca94b6f:000198009d2d7292:022e3bdb83f722f4:29395631f18e6d2c",
+  "4000      L0 0:3082000:1000 4000L/1000P F=27 B=44/44 cksum=00000095d51287bc:00018a1c7c5864d3:022e6bda28d3cdbd:30cbf90f67010da7",
+  "10000      L0 0:23b000:1000 4000L/1000P F=9 B=15/15 cksum=000000465dd0484d:0000ee8bccf87b46:0199a75c4b321c3b:daf2f3440acde7b8",
+  "20000      L0 0:3087000:1000 4000L/1000P F=2 B=44/44 cksum=0000001fe95d2c3c:0000772acb2fe1c1:00defc32962ead8b:16c65768cca0f5f3",
+  "30000      L0 0:3080000:1000 4000L/1000P F=5 B=44/44 cksum=0000002f458234ae:0000ac63af06b517:013ba397d7fcc9e2:82dfe83840a11552"
  ],
  "layout": "mirror",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 55033856,
+    "offset": 55107584,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d1.img",
-    "offset": 55033856,
+    "offset": 55107584,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 24166400,
+    "offset": 24244224,
     "length": 4096,
     "seed": 1001
    },
    {
     "dev": "d1.img",
-    "offset": 24166400,
+    "offset": 24244224,
     "length": 4096,
     "seed": 1001
    }
@@ -520,8 +521,8 @@
   "zdb_error": "failed to hold dataset 'fx-modern-mirror/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-mirror/home': Input/output error | zdb: can't open 'fx-modern-mirror/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "7fb1362381779b4b9d9113a9a968666187899fbf68da0be78ba0247d8c96c6a9",
-  "d1.img": "3bc7771383dcfa7cc3ce5d022cf924fc08a5d8d8c6a9f189b0097053a16bc4aa"
+  "d0.img": "388b2b8994c2bc6bcbfef142758913e68f3b4f253bfdf4cebcc845c3b3a9e53e",
+  "d1.img": "2312a4eca2ff2d908cc96b37a846af0a76b4a60eebc43706a205ebbe14c49e1b"
  },
- "seconds": 15.1
+ "seconds": 14.4
 }

@@ -656,18 +656,18 @@
    "type": "META",
    "id": 0,
    "objects": 60,
-   "size": "312K"
+   "size": "336K"
   },
   "fx-modern-twodatasets/home": {
    "type": "ZPL",
-   "id": 260,
+   "id": 387,
    "objects": 74,
    "size": "5.69M",
-   "rootbp": "DVA[0]=<0:3083000:1000> DVA[1]=<0:131e000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=0000000fcc9a28b3:000029100edd5d4a:003884e59d63154b:36e361c9c17679fd",
+   "rootbp": "DVA[0]=<0:3085000:1000> DVA[1]=<0:131e000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=0000000fc02d2c8b:00002930fab3ed64:0038dabd9f0d3df6:37310c9d1aad26d1",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 50868224,
+     "offset": 50876416,
      "asize": 4096
     },
     {
@@ -683,7 +683,7 @@
   },
   "fx-modern-twodatasets/var": {
    "type": "ZPL",
-   "id": 145,
+   "id": 413,
    "objects": 42,
    "size": "304K"
   },
@@ -702,22 +702,22 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:3081000:1000 20000L/1000P F=74 B=44/44 cksum=0000008664ea394b:0001eece832df3bf:03916b7a25819266:673eb0ed19392951",
-  "0  L4     0:3080000:1000 20000L/1000P F=74 B=44/44 cksum=000000890bf78275:0001f9002a33ab18:03a519b1c6fdf6c8:80afaea4254a6d70",
-  "0   L3    0:307f000:1000 20000L/1000P F=74 B=44/44 cksum=000000885ad6e9aa:0001f64538ffb8e2:039fb550c0ddfbd3:79946baa70b16d6a",
-  "0    L2   0:307e000:1000 20000L/1000P F=74 B=44/44 cksum=00000087e83ac414:0001f47f13249714:039c30aad371ca8e:74ec88fb6274a617",
-  "0     L1  0:307d000:1000 20000L/1000P F=74 B=44/44 cksum=000000939eb8ed54:00020bbec6e81d9c:03a4b3c1efccbcf5:57a19c2fd383ebbe",
-  "0      L0 0:3074000:1000 4000L/1000P F=31 B=44/44 cksum=0000009c8776c339:00018b27e4fce64c:0225ec707dc655bc:26b01c4d21cbfa73",
-  "4000      L0 0:3073000:1000 4000L/1000P F=26 B=44/44 cksum=0000008c10c6fe31:00017755728afb34:0219aee3a0028f28:1f45423ec14dd591",
-  "10000      L0 0:307c000:1000 4000L/1000P F=16 B=44/44 cksum=0000006743838fdc:00013a3b3e75d708:01ef285dbd29fa76:1913cac5859087fa",
-  "20000      L0 0:128000:1000 4000L/1000P F=1 B=12/12 cksum=000000192bfa263d:000060249f657daa:00b7de4e8f7d351f:eac23e0e5ae91a71"
+  "0 L5      0:3083000:1000 20000L/1000P F=74 B=44/44 cksum=000000872a3cd15f:0001f1980c3f9350:0396825d3055b385:6d81198aafd4f911",
+  "0  L4     0:3082000:1000 20000L/1000P F=74 B=44/44 cksum=0000008743ea80fe:0001f1fdcf31ea65:03974c2fe1882f3d:6e8c32602aba2e09",
+  "0   L3    0:3081000:1000 20000L/1000P F=74 B=44/44 cksum=000000859ad9b309:0001ebaf3bcdeaa4:038b3d20edbe54a3:5f143d731a1c025c",
+  "0    L2   0:3080000:1000 20000L/1000P F=74 B=44/44 cksum=00000086d0055548:0001f03194ab43fa:0393b98a1761093c:69cf3dc57a89c89a",
+  "0     L1  0:307f000:1000 20000L/1000P F=74 B=44/44 cksum=000000916e81de39:000205fdd5c847b0:039de78d32824371:537a76d347862958",
+  "0      L0 0:3079000:1000 4000L/1000P F=31 B=44/44 cksum=000000a76c2a9247:0001a35261f433ea:0246b88dcfd0dbe7:48bbd9ce20ff441b",
+  "4000      L0 0:3078000:1000 4000L/1000P F=32 B=44/44 cksum=000000b8e244490a:0001b722ae08090c:02529f327f95c747:4aeb7b5800156c2c",
+  "8000      L0 0:307e000:1000 4000L/1000P F=6 B=44/44 cksum=00000038d3955e13:0000c8a688c4cedf:01648743e2bd7fec:a90d80b1e43c37fd",
+  "10000      L0 0:3075000:1000 4000L/1000P F=5 B=44/44 cksum=0000002e97cc5f76:0000aa358762fba7:013821185cb9a464:7f187158dfdcf61b"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 55062528,
+    "offset": 55070720,
     "length": 4096,
     "seed": 1000
    },
@@ -731,7 +731,7 @@
   "zdb_error": "failed to hold dataset 'fx-modern-twodatasets/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-twodatasets/home': Input/output error | zdb: can't open 'fx-modern-twodatasets/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "045cddd6485e1fd49022940ed787cfada60b75a325c129b8df25b623963f2e16"
+  "d0.img": "d35981aa9b6afbc1fb948d2d5cbbd26af3c28b9f30a631e3efbd3b2c9811ef71"
  },
- "seconds": 10.1
+ "seconds": 11.6
 }

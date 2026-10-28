@@ -69,23 +69,23 @@
    "type": "META",
    "id": 0,
    "objects": 54,
-   "size": "312K"
+   "size": "324K"
   },
   "fx-modern-zvol/vol": {
    "type": "ZVOL",
-   "id": 260,
+   "id": 145,
    "objects": 2,
    "size": "6.19M",
-   "rootbp": "DVA[0]=<0:302f000:1000> DVA[1]=<0:11d5000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=28L/28P fill=2 cksum=000000053c7f7209:000012e6bfaf107d:0022485b6632739c:29a84a1f06e467eb",
+   "rootbp": "DVA[0]=<0:3013000:1000> DVA[1]=<0:11ba000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=28L/28P fill=2 cksum=0000000614c69fd5:00001639c620afbc:0028cece3c1a32c1:322e38ac3e2aa1a5",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 50524160,
+     "offset": 50409472,
      "asize": 4096
     },
     {
      "vdev": 0,
-     "offset": 18698240,
+     "offset": 18587648,
      "asize": 4096
     }
    ],
@@ -109,25 +109,25 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:3022000:1000 20000L/1000P F=2 B=27/27 cksum=000000862aac846c:0001edf09ef64b44:038fc50c4b39440b:6526f5ba802b244c",
-  "0  L4     0:3021000:1000 20000L/1000P F=2 B=27/27 cksum=00000084b9045716:0001e8381f018a4e:03846d065ff96d38:5623f81fd1c6c2b2",
-  "0   L3    0:3020000:1000 20000L/1000P F=2 B=27/27 cksum=000000863260c989:0001edbdc02a04b1:038ed618d38928e9:634e9bc49c35b97f",
-  "0    L2   0:301f000:1000 20000L/1000P F=2 B=27/27 cksum=0000008855a89272:0001f629a8b10c8b:039f70b7859d2c47:792736ace1f883a2",
-  "0     L1  0:301e000:1000 20000L/1000P F=2 B=27/27 cksum=0000008522fbd138:0001e988c3fef9ee:03867b03fd338f7c:583b5aa76bb0fdf2",
-  "0      L0 0:301d000:1000 4000L/1000P F=2 B=27/27 cksum=0000001aa68c8ce2:00006668d9fc9f93:00c50809595bb5d5:fd1076c212ac0610"
+  "0 L5      0:3006000:1000 20000L/1000P F=2 B=27/27 cksum=00000086c48c566b:0001f001808eff33:039354f7e60f31ac:694331736ff59080",
+  "0  L4     0:3005000:1000 20000L/1000P F=2 B=27/27 cksum=000000878a86c63c:0001f30c897b6a8a:03995335951b3d95:71238af651bf07db",
+  "0   L3    0:3004000:1000 20000L/1000P F=2 B=27/27 cksum=00000086cbeaa952:0001f01c9a5995f2:03938695e551d7b5:697f6e9426c21933",
+  "0    L2   0:3003000:1000 20000L/1000P F=2 B=27/27 cksum=00000088525b7c97:0001f61c223e7fbc:039f551020f472cd:79019528b0510f69",
+  "0     L1  0:3002000:1000 20000L/1000P F=2 B=27/27 cksum=00000086b6e5810f:0001f0148da0e8e9:0393f477d75a3ae3:6a9cc9110bb59ae1",
+  "0      L0 0:3001000:1000 4000L/1000P F=2 B=27/27 cksum=0000001b85ce12c3:000069b94ba37a64:00cb552962afbdad:050e49c3ceda4848"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 54718464,
+    "offset": 54603776,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 22892544,
+    "offset": 22781952,
     "length": 4096,
     "seed": 1001
    }
@@ -135,7 +135,7 @@
   "zdb_error": "failed to hold dataset 'fx-modern-zvol/vol': Input/output error | [exit 2]failed to hold dataset 'fx-modern-zvol/vol': Input/output error | zdb: can't open 'fx-modern-zvol/vol': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "5efaa16f260574ad1820f26b9c872db3070703d14731ab869ed6af38380a6f40"
+  "d0.img": "092a267e4b29e87c5ce865342fe32a8ab8b25a8eb0839b14c1fc6e1f667284ac"
  },
- "seconds": 11.1
+ "seconds": 10.1
 }

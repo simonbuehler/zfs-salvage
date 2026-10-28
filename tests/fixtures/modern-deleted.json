@@ -442,19 +442,19 @@
   },
   "fx-modern-deleted/home": {
    "type": "ZPL",
-   "id": 132,
+   "id": 388,
    "objects": 54,
-   "size": "5.57M",
-   "rootbp": "DVA[0]=<0:30a0000:1000> DVA[1]=<0:1343000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=47L/47P fill=54 cksum=0000001015f4568c:00002aa9a9728f72:003c56362559b913:3c87183d56346261",
+   "size": "5.56M",
+   "rootbp": "DVA[0]=<0:308c000:1000> DVA[1]=<0:1335000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=47L/47P fill=54 cksum=000000110132a716:00002edae372c7a6:0044d0a0b00d99a7:476e6e78653e7cf2",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 50987008,
+     "offset": 50905088,
      "asize": 4096
     },
     {
      "vdev": 0,
-     "offset": 20197376,
+     "offset": 20140032,
      "asize": 4096
     }
    ],
@@ -478,28 +478,27 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:309e000:1000 20000L/1000P F=54 B=47/47 cksum=000000872c13bb5b:0001f193f5660f69:039663c7649cb045:6d3afea98277c601",
-  "0  L4     0:309d000:1000 20000L/1000P F=54 B=47/47 cksum=00000088858ce67a:0001f6f279e9624d:03a114cd84f7bc0d:7b6ff2ee88fe0eb2",
-  "0   L3    0:309c000:1000 20000L/1000P F=54 B=47/47 cksum=00000087e91af9a3:0001f4875a4eebad:039c4a889b7ba15a:751b298f6000846e",
-  "0    L2   0:309b000:1000 20000L/1000P F=54 B=47/47 cksum=00000087069cc24f:0001f10abb1b566e:039569d2a58d9be7:6c0d79e4f3dd55e9",
-  "0     L1  0:309a000:1000 20000L/1000P F=54 B=47/47 cksum=0000009295683580:00020770b9c5f002:039bcd523b41f58c:4b69103cb9fc04c1",
-  "0      L0 0:3097000:1000 4000L/1000P F=21 B=47/47 cksum=0000006da34b169c:00014619fc094514:01f64ec0be04a66e:14e7e9afdc1b8ac9",
-  "4000      L0 0:3098000:1000 4000L/1000P F=19 B=47/47 cksum=00000073a6148bed:00015807c87aab05:0210efccde94e776:2ed8c86e249bca8b",
-  "10000      L0 0:153000:1000 4000L/1000P F=3 B=13/13 cksum=000000225cdd7bfb:00007e546183574e:00e8d6c372fb4fb3:1edef7cdea98630f",
-  "20000      L0 0:3099000:1000 4000L/1000P F=11 B=47/47 cksum=000000520ae8a774:00010d8ff89f5414:01c2d6610a95d3ef:ff613aff17c9c3e6"
+  "0 L5      0:308a000:1000 20000L/1000P F=54 B=47/47 cksum=00000088d335fd32:0001f81be9beb088:03a34e67fd86a5b5:7e4721ff2f2b5779",
+  "0  L4     0:3089000:1000 20000L/1000P F=54 B=47/47 cksum=0000008795e7b407:0001f33d301ebf4e:0399bab6f6b4de61:71b5c1f39c4b685a",
+  "0   L3    0:3088000:1000 20000L/1000P F=54 B=47/47 cksum=00000087ed78c2ba:0001f48f8cd4fabb:039c48d75e8488ef:75014e8133ba2266",
+  "0    L2   0:3087000:1000 20000L/1000P F=54 B=47/47 cksum=00000086308a20dc:0001edb987596ae2:038ed3cedacfd6ae:6353a49b9a478bbe",
+  "0     L1  0:3086000:1000 20000L/1000P F=54 B=47/47 cksum=000000909212acdd:00020847ca435b0f:03ab6243284a2c31:6e9459dffb1da6d6",
+  "0      L0 0:3084000:1000 4000L/1000P F=21 B=47/47 cksum=0000006c10f4aec4:000141da002a2cbc:01f1cadc2d76ded6:1391e4d8e59f59c2",
+  "4000      L0 0:3085000:1000 4000L/1000P F=21 B=47/47 cksum=000000760c53584e:0001555a4e6cf7a8:0200d259f8aa0d6b:13dc2a2d39d8dae2",
+  "10000      L0 0:3071000:1000 4000L/1000P F=12 B=44/44 cksum=000000627bb6d682:0001393afdca800b:01fd543dd2e44d13:33f3f103d5101ef6"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 55181312,
+    "offset": 55099392,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 24391680,
+    "offset": 24334336,
     "length": 4096,
     "seed": 1001
    }
@@ -507,7 +506,7 @@
   "zdb_error": "failed to hold dataset 'fx-modern-deleted/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-deleted/home': Input/output error | zdb: can't open 'fx-modern-deleted/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "515e90aa26ce91cb320b15b32f99ed03a9b1789fc8150766770942b748747f3d"
+  "d0.img": "36acb617768a665ac526879ca672ce610ce9ba75a379aaed694efae41ae3d48f"
  },
- "seconds": 11.6
+ "seconds": 15.0
 }

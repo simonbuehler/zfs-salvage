@@ -438,23 +438,23 @@
    "type": "META",
    "id": 0,
    "objects": 54,
-   "size": "324K"
+   "size": "312K"
   },
   "fx-modern-sha256/home": {
    "type": "ZPL",
-   "id": 387,
+   "id": 68,
    "objects": 74,
    "size": "5.69M",
-   "rootbp": "DVA[0]=<0:3065000:1000> DVA[1]=<0:132b000:1000> [L0 DMU objset] sha256 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=8b1724089b43823f:fe267fd8a73af5c3:182486829607675b:37d7d52cf0534d36",
+   "rootbp": "DVA[0]=<0:3086000:1000> DVA[1]=<0:131d000:1000> [L0 DMU objset] sha256 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=29d64c72f83afa86:c66bf67c233905c9:eb680fb7c0cf0e88:ead6b45741126cca",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 50745344,
+     "offset": 50880512,
      "asize": 4096
     },
     {
      "vdev": 0,
-     "offset": 20099072,
+     "offset": 20041728,
      "asize": 4096
     }
    ],
@@ -478,28 +478,28 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:3063000:1000 20000L/1000P F=74 B=44/44 cksum=78c2b93bb461d385:a530d41644aa3855:ba3c2d4e42868d71:e3ee13f979b9b1b2",
-  "0  L4     0:3062000:1000 20000L/1000P F=74 B=44/44 cksum=ada3a0778114e356:ebd982c4949109fa:43fb31e6ae5aaf5e:4ad0ceedf61b62fb",
-  "0   L3    0:3061000:1000 20000L/1000P F=74 B=44/44 cksum=58e9ebd01274b538:fa973c0fa721fddf:2790fdd905ccfc8b:138f2b77ae40957f",
-  "0    L2   0:3060000:1000 20000L/1000P F=74 B=44/44 cksum=87c0621ebfe5dab4:a305f868c8d701d3:95a21216a36d95fa:f1d95ef477144dd8",
-  "0     L1  0:305f000:1000 20000L/1000P F=74 B=44/44 cksum=2b06b0852f2cb5e6:9b8a5bb58a16efdb:a2738a2b33d7918c:93db97e6125cd994",
-  "0      L0 0:3058000:1000 4000L/1000P F=31 B=44/44 cksum=bb059f071a955845:b83d0cbc7e02b4e6:05c8a9bdcbf2b2c2:7ab0c1ddbb8178fd",
-  "4000      L0 0:3059000:1000 4000L/1000P F=32 B=44/44 cksum=71d0960ac0a374c6:0574352a946538d8:e35b7178ef8cb42b:82009affb8fae1a1",
-  "8000      L0 0:305e000:1000 4000L/1000P F=9 B=44/44 cksum=b502ba2b37a356da:814de5605630fda6:1f30ecd3702b6159:9c85910736d87640",
-  "10000      L0 0:126000:1000 4000L/1000P F=2 B=12/12 cksum=916d4bcb18175585:3e03b058eb8a0ee1:63edb313561e18bd:e2937205e35470e1"
+  "0 L5      0:3084000:1000 20000L/1000P F=74 B=44/44 cksum=c66fcc6433a9e276:c1b34498ceb13fac:35323f666ab9d22c:aa2fb278e56fd036",
+  "0  L4     0:3083000:1000 20000L/1000P F=74 B=44/44 cksum=6e96f8750092b05c:95ed232c8131d3a7:a1a5ddc63a7dcffd:de683f89a6e1afc8",
+  "0   L3    0:3082000:1000 20000L/1000P F=74 B=44/44 cksum=ebe505524b885ac4:bae3e878b83a3a12:98970f40abbc1af3:0d92a1060f94a660",
+  "0    L2   0:3081000:1000 20000L/1000P F=74 B=44/44 cksum=b3a95b435dd3c83c:f81352c957cf88b5:819a22012a50e73b:e3f6bc27fed9fe9f",
+  "0     L1  0:3080000:1000 20000L/1000P F=74 B=44/44 cksum=eb5af9365f8f7fd7:b410b726ebf81bce:64c04a260423e087:f60c973b4e54cb45",
+  "0      L0 0:3076000:1000 4000L/1000P F=31 B=44/44 cksum=61041b7759ebcbf2:08684671d04410ba:080cef08fdbdbe3c:25349c8001815c2b",
+  "4000      L0 0:3077000:1000 4000L/1000P F=26 B=44/44 cksum=5c8f4d019ac31fb6:d9b5626b15f175eb:a99a0a01284ee239:6f055013abc50fb0",
+  "10000      L0 0:307f000:1000 4000L/1000P F=12 B=44/44 cksum=84ade79c179424e8:61e0661f12a48b2d:a2af2b644d032d55:a143e17e14f869c5",
+  "20000      L0 0:3075000:1000 4000L/1000P F=5 B=44/44 cksum=dcd06218a63730c8:7e6f911e48863d1b:b22d036bbedd0a4b:4fadc113d9d86dd9"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 54939648,
+    "offset": 55074816,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 24293376,
+    "offset": 24236032,
     "length": 4096,
     "seed": 1001
    }
@@ -507,7 +507,7 @@
   "zdb_error": "failed to hold dataset 'fx-modern-sha256/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-sha256/home': Input/output error | zdb: can't open 'fx-modern-sha256/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "4f1cbad5201a40c29ecc9810621da455379da462e5399af5af97afeba4dcbe5a"
+  "d0.img": "cefaa54ed51fe68111b3d79b2fb0c0a149d92754637579e0103c3a7cc944b123"
  },
- "seconds": 9.9
+ "seconds": 9.7
 }

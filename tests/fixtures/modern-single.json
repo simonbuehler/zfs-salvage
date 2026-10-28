@@ -436,23 +436,23 @@
    "type": "META",
    "id": 0,
    "objects": 54,
-   "size": "300K"
+   "size": "324K"
   },
   "fx-modern-single/home": {
    "type": "ZPL",
-   "id": 259,
+   "id": 64,
    "objects": 74,
-   "size": "5.71M",
-   "rootbp": "DVA[0]=<0:3098000:1000> DVA[1]=<0:1327000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=00000009a4b31ca7:00001b4ee98f2389:002938166ca4c1b7:2bdf6fe5a86f22a2",
+   "size": "5.72M",
+   "rootbp": "DVA[0]=<0:308b000:1000> DVA[1]=<0:131c000:1000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=44L/44P fill=74 cksum=0000000ff027013c:00002ade385b7d1a:003d9d67c0cefdf0:3ed617354be1a00b",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 50954240,
+     "offset": 50900992,
      "asize": 4096
     },
     {
      "vdev": 0,
-     "offset": 20082688,
+     "offset": 20037632,
      "asize": 4096
     }
    ],
@@ -476,28 +476,29 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:3096000:1000 20000L/1000P F=74 B=44/44 cksum=000000865cf50131:0001ee6370c7a615:039018bca463e936:64f1c9094337e9d6",
-  "0  L4     0:3095000:1000 20000L/1000P F=74 B=44/44 cksum=0000008704dc3bc5:0001f0f78ea94444:03952ba7c9f18493:6b9b6659f4ab9bc2",
-  "0   L3    0:3094000:1000 20000L/1000P F=74 B=44/44 cksum=0000008633f843eb:0001edc425676aa8:038ee2e9de9c4dc0:635fb1085cfd553f",
-  "0    L2   0:3093000:1000 20000L/1000P F=74 B=44/44 cksum=000000872a494bc3:0001f18cb209b256:039655087be0851b:6d2703e33b1c3cc0",
-  "0     L1  0:3092000:1000 20000L/1000P F=74 B=44/44 cksum=00000090a3f2610b:0001ffad7f559b1c:038c798a17cef47e:376949c595d9551b",
-  "0      L0 0:3085000:1000 4000L/1000P F=31 B=44/44 cksum=000000a4eaac2193:00019c7245a64bd9:023d43b82b13d675:402b7ca2f5d937e6",
-  "4000      L0 0:308c000:1000 4000L/1000P F=26 B=44/44 cksum=0000009787b232d1:00019e7720e0c2d1:025d0f2172d2c2ad:6d9e3b1c114c543d",
-  "10000      L0 0:3091000:1000 4000L/1000P F=14 B=44/44 cksum=00000057f60a1720:000118a0609febc9:01cbb0f1db84f39b:0268c8c4b9078812",
-  "20000      L0 0:214000:1000 4000L/1000P F=3 B=14/14 cksum=00000028ee26c30a:0000978aff6799ee:01195461baf40596:5d29ec8ab85bdf03"
+  "0 L5      0:3089000:1000 20000L/1000P F=74 B=44/44 cksum=0000008703e99eb1:0001f0fbc07ac69a:039543b5e826dc0c:6bd005dab796b305",
+  "0  L4     0:3088000:1000 20000L/1000P F=74 B=44/44 cksum=00000087f3132750:0001f4aa9d7b11e7:039c881ccf119f12:7561adc886361fda",
+  "0   L3    0:3087000:1000 20000L/1000P F=74 B=44/44 cksum=000000885898c3d3:0001f63af6ac01cd:039f9e42e7b46d75:797257be3368fa94",
+  "0    L2   0:3086000:1000 20000L/1000P F=74 B=44/44 cksum=00000086ee9d765f:0001f0a79a5bf586:03949d4c17dd695a:6af4654e7497bef4",
+  "0     L1  0:3085000:1000 20000L/1000P F=74 B=44/44 cksum=0000009611e7b48a:00020e973f4a216e:039fca4653e267b1:46677fef47668efe",
+  "0      L0 0:307e000:1000 4000L/1000P F=31 B=44/44 cksum=000000a9b314e210:0001b030243053db:02602ac4645eba65:67e9285ea7f49231",
+  "4000      L0 0:307f000:1000 4000L/1000P F=32 B=44/44 cksum=000000b227e3ed12:0001b651a531cb5b:025c36088ad4c1b7:5a29a9beecf66f2f",
+  "8000      L0 0:3084000:1000 4000L/1000P F=1 B=44/44 cksum=00000017fae5581f:00005b51067d701b:00ae1f2dc17423ab:ddab08208332fcbc",
+  "10000      L0 0:21a000:1000 4000L/1000P F=5 B=14/14 cksum=00000035ed95b5a3:0000bfe7bfcc9b7b:01574161f7518b14:9b7e479e248e3fe5",
+  "20000      L0 0:307d000:1000 4000L/1000P F=5 B=44/44 cksum=0000002ccc45ed55:0000a3d3a4daf281:012ccd73eeb5acdd:71b83deb28490599"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 55148544,
+    "offset": 55095296,
     "length": 4096,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 24276992,
+    "offset": 24231936,
     "length": 4096,
     "seed": 1001
    }
@@ -505,7 +506,7 @@
   "zdb_error": "failed to hold dataset 'fx-modern-single/home': Input/output error | [exit 2]failed to hold dataset 'fx-modern-single/home': Input/output error | zdb: can't open 'fx-modern-single/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "153690d196f658811526f0db594110a82e6ef813982c67989aae919f940a5ceb"
+  "d0.img": "25998ef23d4510d8da6d8361ba0a196c12f4dfa067f681f714d4f8fc8310b8b9"
  },
- "seconds": 10.0
+ "seconds": 10.1
 }

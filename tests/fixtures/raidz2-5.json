@@ -445,23 +445,23 @@
    "type": "META",
    "id": 0,
    "objects": 56,
-   "size": "533K"
+   "size": "554K"
   },
   "fx-raidz2-5/home": {
    "type": "ZPL",
-   "id": 387,
+   "id": 259,
    "objects": 74,
    "size": "7.02M",
-   "rootbp": "DVA[0]=<0:dd1000:3000> DVA[1]=<0:42eb000:3000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=15L/15P fill=74 cksum=000000113998c9d7:00002ed4b25d1e44:0043dc87aa2c7b2f:4598bb51489079f3",
+   "rootbp": "DVA[0]=<0:dce000:3000> DVA[1]=<0:42dc000:3000> [L0 DMU objset] fletcher4 uncompressed unencrypted LE contiguous unique double size=1000L/1000P birth=15L/15P fill=74 cksum=000000119240be69:00002fe989c6de97:0045c02894daea34:47eba0e9e37dd209",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 14487552,
+     "offset": 14475264,
      "asize": 12288
     },
     {
      "vdev": 0,
-     "offset": 70168576,
+     "offset": 70107136,
      "asize": 12288
     }
    ],
@@ -485,15 +485,15 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:dcb000:3000 20000L/1000P F=74 B=15/15 cksum=00000086ca60d5a3:0001f00fd4660a76:0393601a87df4306:693b38aba10a6feb",
-  "0  L4     0:dc8000:3000 20000L/1000P F=74 B=15/15 cksum=00000086e5c32ecc:0001f07de16553a1:03943d5de0f5b081:6a63f9026f4f4e6c",
-  "0   L3    0:dc5000:3000 20000L/1000P F=74 B=15/15 cksum=000000868b79951d:0001ef6bcf1f3cdd:0392ac693543639c:68f36282e22c8fde",
-  "0    L2   0:dc2000:3000 20000L/1000P F=74 B=15/15 cksum=00000085f8d7384a:0001ecda04e210c8:038d12f46f609b12:60fa2de02e555062",
-  "0     L1  0:dbf000:3000 20000L/1000P F=74 B=15/15 cksum=00000091ac9ef39b:000206c465c32815:039f159e57159944:549430aa2660d536",
-  "0      L0 0:db9000:3000 4000L/1000P F=31 B=15/15 cksum=000000a125f349b1:0001947068c80888:022b85b2fca570a7:234be449e2288bb3",
-  "4000      L0 0:dbc000:3000 4000L/1000P F=31 B=15/15 cksum=000000b50f02bc1f:0001c09a276e1e65:026c048812c7ce3c:6b255dc23ca8db2a",
-  "10000      L0 0:db3000:3000 4000L/1000P F=7 B=15/15 cksum=0000003b2ab2ae2c:0000cc98a985211f:0164983a2947e8f8:a1b27990f4b0b5af",
-  "20000      L0 0:db6000:3000 4000L/1000P F=5 B=15/15 cksum=000000275b0d3863:00008eb053bfe021:0103e388668122f3:3d0ffd1f98289c75"
+  "0 L5      0:dc8000:3000 20000L/1000P F=74 B=15/15 cksum=000000869d986e65:0001ef63f895584f:0392163de960446c:6795063f81459289",
+  "0  L4     0:dc5000:3000 20000L/1000P F=74 B=15/15 cksum=00000086a1ceeded:0001ef6ffdd64522:039224ea40af6e65:679c7230d2a45401",
+  "0   L3    0:dc2000:3000 20000L/1000P F=74 B=15/15 cksum=0000008760fb1760:0001f262ee1a47d1:0397f905c86b3d9d:6f4c7715134a811b",
+  "0    L2   0:dbf000:3000 20000L/1000P F=74 B=15/15 cksum=0000008612a3bc4c:0001ed3f822c496b:038ddac4a9ca5957:6200b13422fa677f",
+  "0     L1  0:dbc000:3000 20000L/1000P F=74 B=15/15 cksum=0000009208f9bcb3:00020707243d77a2:039dc2f341a04a36:50e911c5a8af9748",
+  "0      L0 0:daa000:3000 4000L/1000P F=31 B=15/15 cksum=0000009e5d0ed75c:000198e564863bb5:024041a97531ac03:4430085ac76eb8ea",
+  "4000      L0 0:dad000:3000 4000L/1000P F=31 B=15/15 cksum=000000b1abf2188a:0001af231847875c:0249689f7adef998:4038bb21f0c249af",
+  "10000      L0 0:db9000:3000 4000L/1000P F=7 B=15/15 cksum=0000003b0f3bd2ab:0000cc3396a95d23:01641ba321666c4d:a19c76d14639ea09",
+  "20000      L0 0:d9b000:3000 4000L/1000P F=5 B=15/15 cksum=0000002735bed065:00008dfa1638f513:01022f5c32242a09:3a6677bc0a6be0da"
  ],
  "layout": "raidz2",
  "damage": {
@@ -501,11 +501,11 @@
   "note": "raidz: physical location of a DVA needs the raidz map; damaged variant later"
  },
  "image_sha256": {
-  "d0.img": "5ab33b179a04ff577efe66c33e511bf3f8e15b40c9da98ca2a79e2465f155aa7",
-  "d1.img": "9ea75289ecd7487575ac0c8d870081a869462c578cdd11ace1696dc1554eaf29",
-  "d2.img": "3f08cfb580302fb713d7b53d0d015215c4dc82bc43071852d1f718804009a638",
-  "d3.img": "e51586ec61dce07beaa0f1e33167063a92117f11edcd02c97bfee115aad3a911",
-  "d4.img": "f9631295a87acf3dfb7e38c3389e8a9195f7f6d7e6366b5f459aff750c950064"
+  "d0.img": "161e96894065cf09f6fd76ae11f53dbcdab49b62cfa233bd30def568d6c2c069",
+  "d1.img": "4557d58424a3e7384e544ba7c0dd8cd5d75845ae67c674b46955f31d02604cb1",
+  "d2.img": "c9dd5cf80a7118ec5ae49abac5f31f7b30d287de1b8e5ca0574533f544a2f056",
+  "d3.img": "fe0d03d75fbbf0bf95ae9ddc734cda19a1f4e0e40538eef3d130bc2d6c44307d",
+  "d4.img": "a1094123fbd93c2f6beed8ccad95610996b25c4caa075ac4d3890289d873add5"
  },
- "seconds": 24.1
+ "seconds": 22.8
 }

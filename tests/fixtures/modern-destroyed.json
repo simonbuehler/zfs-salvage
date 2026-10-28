@@ -442,7 +442,7 @@
    "type": "META",
    "id": 0,
    "objects": 47,
-   "size": "312K"
+   "size": "300K"
   },
   "fx-modern-destroyed": {
    "type": "ZPL",
@@ -455,7 +455,7 @@
  "target": "fx-modern-destroyed/home",
  "layout": "plain",
  "image_sha256": {
-  "d0.img": "b3e6778059c9c7aef2ae5873ca1ced3605dfda4062029a5ee083e01c74698d89"
+  "d0.img": "1b0bdd681948837df991df4e86eaa0763841e5e3bc5c2defb7bf5742b8a2b338"
  },
  "seconds": 9.8
 }

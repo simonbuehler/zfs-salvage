@@ -437,23 +437,23 @@
    "type": "META",
    "id": 0,
    "objects": 47,
-   "size": "146K"
+   "size": "150K"
   },
   "fx-legacy-single/home": {
    "type": "ZPL",
-   "id": 263,
+   "id": 259,
    "objects": 74,
-   "size": "4.44M",
-   "rootbp": "DVA[0]=<0:5fa000:200> DVA[1]=<0:11f2800:200> [L0 DMU objset] fletcher4 lzjb unencrypted LE contiguous unique double size=1000L/200P birth=41L/41P fill=74 cksum=0000001d90ed10a9:000008e5ac15b811:00017c3162f1a4c7:002e3e5a276a3240",
+   "size": "4.43M",
+   "rootbp": "DVA[0]=<0:5f7e00:200> DVA[1]=<0:11ee600:200> [L0 DMU objset] fletcher4 lzjb unencrypted LE contiguous unique double size=1000L/200P birth=41L/41P fill=74 cksum=0000002158ac9697:00000a46e7d1704a:0001bdd8fa6689cd:00368509b5cc26fb",
    "dvas": [
     {
      "vdev": 0,
-     "offset": 6266880,
+     "offset": 6258176,
      "asize": 512
     },
     {
      "vdev": 0,
-     "offset": 18819072,
+     "offset": 18802176,
      "asize": 512
     }
    ],
@@ -477,29 +477,28 @@
   "data_block_size": 16384
  },
  "meta_dnode_blocks": [
-  "0 L5      0:5f8800:1200 20000L/1200P F=74 B=41/41 cksum=000002ac365c0bf1:00065fe54e91ef81:0985edf089c21abb:a2468131195a3871",
-  "0  L4     0:5f7600:1200 20000L/1200P F=74 B=41/41 cksum=000002ab45660d08:00065bbd00413667:097cbd7fea2c7b41:94b93645638efd82",
-  "0   L3    0:5f6400:1200 20000L/1200P F=74 B=41/41 cksum=000002ac4102e203:000660192b7a28f1:09866b5a543773f8:a30f9098552b724f",
-  "0    L2   0:5f5200:1200 20000L/1200P F=74 B=41/41 cksum=000002ab516f8b64:00065bef9bdc11e6:097d2799216f6239:954d07d77fb099df",
-  "0     L1  0:5f4000:1200 20000L/1200P F=74 B=41/41 cksum=000002bd4b05a639:00060e1730876fa6:08c66297f3fdf89e:8e00c301d740f8f8",
-  "0      L0 0:5edc00:e00 4000L/e00P F=31 B=41/41 cksum=000000fd40dd8fda:0001bff12ff3d8ac:0204f8708bad6515:bfbbc6109f92195f",
-  "4000      L0 0:5eea00:c00 4000L/c00P F=26 B=41/41 cksum=000000c8a0a24670:00012361cf5d167c:011c4de9bb1c871c:d2406646efe61551",
-  "10000      L0 0:255e00:800 4000L/800P F=9 B=41/41 cksum=00000089198b6310:0000978fabb15c86:0061e2641c453359:2f662ad19a5d9de5",
-  "20000      L0 0:172c00:400 4000L/400P F=3 B=11/11 cksum=0000006b241a7c87:00003031a128c442:000de47575049551:032029ae6de2b37c",
-  "30000      L0 0:1ea600:600 4000L/600P F=5 B=12/12 cksum=0000007793acc0a7:00005bfdc76e28be:0029a0817c2e1722:0e4ad3bed88616da"
+  "0 L5      0:5f6600:1200 20000L/1200P F=74 B=41/41 cksum=000002ab51e089d2:00065bf027d44513:097d25ad66d6801d:95458a219aff9e31",
+  "0  L4     0:5f5400:1200 20000L/1200P F=74 B=41/41 cksum=000002ab9721ee4e:00065d2418e9ff49:097fd2e35b0164a4:993edcf2f7aaa465",
+  "0   L3    0:5f4200:1200 20000L/1200P F=74 B=41/41 cksum=000002ab75019d39:00065c8c436500a5:097e80d153cd12cb:974896c57e834d4d",
+  "0    L2   0:5f3000:1200 20000L/1200P F=74 B=41/41 cksum=000002aa83cf9977:0006585a6a15f0f8:097528350e9a559a:896381d57c771b59",
+  "0     L1  0:5f1e00:1200 20000L/1200P F=74 B=41/41 cksum=000002bbfba5ac7e:000633237f1f9e40:091786875254eca5:0109dc42fe810602",
+  "0      L0 0:5ec600:e00 4000L/e00P F=31 B=41/41 cksum=000000edfd4162c3:0001a90cfbd025e0:01eac7e244b7a6e7:a8b9062c96eb944b",
+  "4000      L0 0:1fec00:1000 4000L/1000P F=32 B=41/41 cksum=000000f8883083b3:00021f5fe948a518:02d9cf530bf82542:d88a6857766c4a65",
+  "10000      L0 0:5e8000:600 4000L/600P F=6 B=41/41 cksum=00000070b6c96cbc:00005857cc965dd0:0027f4a5ec8ed13f:0d973361ff1127b3",
+  "20000      L0 0:1ec600:600 4000L/600P F=5 B=12/12 cksum=00000075a503e5d1:0000599ffb3dc0cd:002848d1fe67d6e9:0dc4d94088948f21"
  ],
  "layout": "plain",
  "damage": {
   "spec": [
    {
     "dev": "d0.img",
-    "offset": 10461184,
+    "offset": 10452480,
     "length": 512,
     "seed": 1000
    },
    {
     "dev": "d0.img",
-    "offset": 23013376,
+    "offset": 22996480,
     "length": 512,
     "seed": 1001
    }
@@ -507,7 +506,7 @@
   "zdb_error": "failed to hold dataset 'fx-legacy-single/home': Input/output error | [exit 2]failed to hold dataset 'fx-legacy-single/home': Input/output error | zdb: can't open 'fx-legacy-single/home': Input/output error | [exit 1]"
  },
  "image_sha256": {
-  "d0.img": "c3656cb14a5ae4c3ed607a1553d16bd7786cbd299ded4475686a6ea294543b93"
+  "d0.img": "641eda5cfabd0be89df0dc66d8fb31ab2389a8168b5f77e63ad35b5f81bbb10c"
  },
- "seconds": 13.4
+ "seconds": 10.5
 }

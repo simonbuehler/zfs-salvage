@@ -46,6 +46,7 @@ matrix: build
 fixtures-regen:
 	@if [ "$$(id -u)" = 0 ] && modprobe zfs 2>/dev/null; then tests/make-fixtures.sh; \
 	else tests/vm/run.sh tests/make-fixtures.sh; fi
+	cd tests/fixtures && sha256sum */*.xz > SHA256SUMS
 
 fixtures-pack:
 	tests/pack-fixtures.sh
